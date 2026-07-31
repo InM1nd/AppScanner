@@ -81,9 +81,10 @@ Release order:
 
 1. Create a database backup.
 2. Run `npm run db:migrate:deploy` against production.
-3. Deploy the tested `main` commit through Vercel.
-4. Smoke-test owner login, Dashboard, Listings, Import, Settings, a signed Inngest run, and Telegram test notification.
-5. Confirm Provider health and NotificationLog after the first scheduled runs.
+3. Run `npm run db:bootstrap` to create the provider catalog without demo listings.
+4. Deploy the tested `main` commit through Vercel.
+5. Smoke-test owner login, Dashboard, Listings, Import, Settings, a signed Inngest run, and Telegram test notification.
+6. Confirm Provider health and NotificationLog after the first scheduled runs.
 
 Vercel previews are expected for pull requests; only protected `main` deploys production.
 
