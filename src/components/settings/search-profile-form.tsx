@@ -316,7 +316,7 @@ function ToggleField({
 }) {
   return (
     <label className="flex items-center gap-2 text-sm cursor-pointer">
-      <Switch checked={checked} onCheckedChange={onChange} />
+      <Switch aria-label={label} checked={checked} onCheckedChange={onChange} />
       {label}
     </label>
   );
