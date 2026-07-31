@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 24
+  NEXT_TELEMETRY_DISABLED: 1
+  APP_USER_EMAIL: ci@appscanner.local
+
+jobs:
+  quality:
+    name: Quality (no database)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://appscanner:appscanner@127.0.0.1:5432/appscanner_build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run db:validate
+      - run: npm run build
+
+  database-and-browser:
+    name: PostgreSQL 16 and browser gates
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: appscanner
+          POSTGRES_PASSWORD: appscanner
+          POSTGRES_DB: appscanner_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U appscanner -d appscanner_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://appscanner:appscanner@127.0.0.1:5432/appscanner_e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:migration:upgrade
+      - run: npm run db:e2e:migrate
+      - run: npm run db:e2e:seed
+      - run: npm run test:integration
+      - run: npm run test:e2e

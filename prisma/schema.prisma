@@ -1,0 +1,517 @@
+// AppScanner — Vienna apartment search dashboard
+// Prisma schema. See AGENTS.md for the money-field and enum conventions used here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum FinancialConfidence {
+  EXACT
+  ESTIMATE
+  UNKNOWN
+}
+
+enum ImportMethod {
+  MANUAL
+  URL_METADATA
+  EMAIL_ALERT
+}
+
+enum ListingStatus {
+  NEW
+  REVIEWING
+  CONTACTED
+  VIEWING
+  SHORTLISTED
+  REJECTED
+  ARCHIVED
+}
+
+enum ContractType {
+  UNLIMITED
+  FIXED_TERM
+  TEMPORARY
+  UNKNOWN
+}
+
+// Coarse classification used to zero-score listings that are not a normal
+// long-term Vienna rental (WG rooms, purchases, obvious short-term sublets).
+enum ListingType {
+  RENTAL
+  SALE
+  SHARED_ROOM
+  UNKNOWN
+}
+
+enum FurnishedLevel {
+  UNFURNISHED
+  PARTLY_FURNISHED
+  FURNISHED
+  UNKNOWN
+}
+
+enum KitchenType {
+  FITTED
+  BASIC
+  NONE
+  UNKNOWN
+}
+
+enum WashingMachineOption {
+  MACHINE_INCLUDED
+  CONNECTION_ONLY
+  NONE
+  UNKNOWN
+}
+
+enum ParkingAvailability {
+  INCLUDED
+  AVAILABLE_EXTRA_COST
+  NONE
+  UNKNOWN
+}
+
+// Tri-state used for amenities that must never be assumed true from a vague
+// description — only a confirmed source fact may set YES.
+enum TriState {
+  YES
+  NO
+  UNKNOWN
+}
+
+enum HeatingType {
+  DISTRICT
+  GAS
+  ELECTRIC
+  FLOOR
+  OTHER
+  UNKNOWN
+}
+
+enum CommuteRating {
+  EXCELLENT
+  ACCEPTABLE
+  WARNING
+  POOR
+  NOT_CALCULATED
+}
+
+enum ProviderName {
+  WILLHABEN
+  IMMOSCOUT24_AT
+  IMMOWELT_AT
+  DER_STANDARD
+  FINDMYHOME
+  LYSTIO
+  GENERIC_URL
+  MANUAL
+}
+
+enum ProviderHealth {
+  OK
+  DEGRADED
+  DOWN
+  UNKNOWN
+}
+
+enum SourceAvailability {
+  ACTIVE
+  RESERVED
+  GONE
+  UNKNOWN
+}
+
+enum ImportJobStatus {
+  PENDING
+  PARSED
+  NEEDS_REVIEW
+  SAVED
+  DUPLICATE
+  FAILED
+}
+
+enum SnapshotChangeType {
+  IMPORTED
+  PRICE_CHANGE
+  DESCRIPTION_CHANGE
+  STATUS_CHANGE
+  AVAILABILITY_CHANGE
+  REFRESHED
+}
+
+enum NotificationChannel {
+  TELEGRAM
+}
+
+enum NotificationType {
+  NEW_HIGH_SCORE
+  PRICE_DROP
+  VIEWING_REMINDER
+  URGENCY_WARNING
+  DAILY_DIGEST
+  TELEGRAM_TEST
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  RATE_LIMITED
+  SKIPPED
+}
+
+// ---------------------------------------------------------------------------
+// Core / auth-ready models
+// ---------------------------------------------------------------------------
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  telegramChatId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  searchProfiles  SearchProfile[]
+  watchlistItems  WatchlistItem[]
+  notes           Note[]
+  importJobs      ImportJob[]
+  notificationLog NotificationLog[]
+}
+
+model SearchProfile {
+  id                     String   @id @default(cuid())
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                   String   @default("Default")
+  city                   String   @default("Wien")
+  preferredDistricts     Int[]    @default([14, 15, 16])
+  secondaryDistricts     Int[]    @default([6, 7, 10, 11, 12])
+  workDestinationLabel   String   @default("Schweglerstraße 20/19, 1150 Wien")
+  workDestinationLat     Float    @default(48.19790)
+  workDestinationLng     Float    @default(16.32340)
+  maxCommuteMinutes      Int      @default(30)
+  requireSeparateBedroom Boolean  @default(true)
+  minRooms               Float    @default(2)
+  targetMonthlyMin       Decimal  @default(900) @db.Decimal(10, 2)
+  targetMonthlyMax       Decimal  @default(1000) @db.Decimal(10, 2)
+  absoluteMonthlyMax     Decimal  @default(1100) @db.Decimal(10, 2)
+  moveInEarliest         DateTime @default("2026-09-15T00:00:00.000Z")
+  moveInLatest           DateTime @default("2026-10-01T00:00:00.000Z")
+  needsFittedKitchen     Boolean  @default(true)
+  needsWashingMachine    Boolean  @default(true)
+  parkingRequired        Boolean  @default(false)
+  petsAllowed            Boolean  @default(false)
+  preferNoCommission     Boolean  @default(true)
+  longTermOnly           Boolean  @default(true)
+  scoringWeights         Json     @default("{\"budget\":25,\"commute\":25,\"layout\":15,\"condition\":10,\"parking\":8,\"moveIn\":7,\"contract\":5,\"infrastructure\":5}")
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Providers & ingestion
+// ---------------------------------------------------------------------------
+
+model Provider {
+  id                String         @id @default(cuid())
+  name              ProviderName   @unique
+  displayName       String
+  isEnabled         Boolean        @default(true)
+  healthStatus      ProviderHealth @default(UNKNOWN)
+  lastHealthCheckAt DateTime?
+  lastError         String?
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  listings      Listing[]
+  savedSearches SavedSearch[]
+  importJobs    ImportJob[]
+}
+
+model SavedSearch {
+  id                     String   @id @default(cuid())
+  providerId             String
+  provider               Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  label                  String
+  searchUrl              String
+  emailAlertInstructions String?
+  createdAt              DateTime @default(now())
+
+  @@index([providerId])
+}
+
+model ImportJob {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerId      String?
+  provider        Provider?       @relation(fields: [providerId], references: [id])
+  method          ImportMethod
+  inputUrl        String?
+  inputEmailRaw   String?
+  status          ImportJobStatus @default(PENDING)
+  rawParsed       Json?
+  resultListingId String?
+  errorMessage    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Listings
+// ---------------------------------------------------------------------------
+
+model Listing {
+  id                     String             @id @default(cuid())
+  title                  String
+  providerId             String
+  provider               Provider           @relation(fields: [providerId], references: [id])
+  sourceListingId        String?
+  canonicalUrl           String
+  normalizedCanonicalUrl String?            @unique
+  importMethod           ImportMethod
+  fetchedAt              DateTime           @default(now())
+  importedAt             DateTime           @default(now())
+  createdAtSource        DateTime?
+  sourceAvailability     SourceAvailability @default(ACTIVE)
+  lastSourceCheckedAt    DateTime?
+
+  listingType ListingType @default(UNKNOWN)
+
+  // Location
+  city       String  @default("Wien")
+  address    String?
+  postalCode String?
+  district   Int?
+  latitude   Float?
+  longitude  Float?
+
+  // Layout
+  rooms              Float?
+  squareMeters       Float?
+  hasSeparateBedroom TriState       @default(UNKNOWN)
+  furnishedLevel     FurnishedLevel @default(UNKNOWN)
+
+  // Financials — each field: amount + confidence + free-text source explanation.
+  baseRentAmount     Decimal?            @db.Decimal(10, 2)
+  baseRentConfidence FinancialConfidence @default(UNKNOWN)
+  baseRentSourceText String?
+
+  operatingCostsAmount     Decimal?            @db.Decimal(10, 2)
+  operatingCostsConfidence FinancialConfidence @default(UNKNOWN)
+  operatingCostsSourceText String?
+
+  heatingCostAmount     Decimal?            @db.Decimal(10, 2)
+  heatingCostConfidence FinancialConfidence @default(UNKNOWN)
+  heatingCostSourceText String?
+
+  hotWaterCostAmount     Decimal?            @db.Decimal(10, 2)
+  hotWaterCostConfidence FinancialConfidence @default(UNKNOWN)
+  hotWaterCostSourceText String?
+
+  electricityEstimateAmount     Decimal?            @db.Decimal(10, 2)
+  electricityEstimateConfidence FinancialConfidence @default(UNKNOWN)
+  electricityEstimateSourceText String?
+
+  internetEstimateAmount     Decimal?            @db.Decimal(10, 2)
+  internetEstimateConfidence FinancialConfidence @default(UNKNOWN)
+  internetEstimateSourceText String?
+
+  parkingMonthlyCostAmount     Decimal?            @db.Decimal(10, 2)
+  parkingMonthlyCostConfidence FinancialConfidence @default(UNKNOWN)
+  parkingMonthlyCostSourceText String?
+
+  depositAmount     Decimal?            @db.Decimal(10, 2)
+  depositConfidence FinancialConfidence @default(UNKNOWN)
+  depositSourceText String?
+
+  commissionAmount     Decimal?            @db.Decimal(10, 2)
+  commissionConfidence FinancialConfidence @default(UNKNOWN)
+  commissionSourceText String?
+
+  contractFeeAmount     Decimal?            @db.Decimal(10, 2)
+  contractFeeConfidence FinancialConfidence @default(UNKNOWN)
+  contractFeeSourceText String?
+
+  // Denormalized, computed totals (see src/lib/cost.ts — recomputed on every save)
+  monthlyKnownCost        Decimal? @db.Decimal(10, 2)
+  monthlyHousingSubtotal  Decimal? @db.Decimal(10, 2)
+  monthlyLikelyTotal      Decimal? @db.Decimal(10, 2)
+  hasUnknownMandatoryCost Boolean  @default(true)
+  unknownRecurringFields  String[] @default([])
+  upfrontCostEstimate     Decimal? @db.Decimal(10, 2)
+  upfrontKnownTotal       Decimal? @db.Decimal(10, 2)
+  hasUnknownUpfrontCost   Boolean  @default(true)
+  unknownUpfrontFields    String[] @default([])
+  costRedFlags            String[] @default([])
+  recomputePending        Boolean  @default(false)
+
+  availabilityDate DateTime?
+  contractType     ContractType @default(UNKNOWN)
+
+  // Amenities — confirmed-only tri-state, never inferred from vague text.
+  kitchen                KitchenType          @default(UNKNOWN)
+  washingMachine         WashingMachineOption @default(UNKNOWN)
+  parkingAvailability    ParkingAvailability  @default(UNKNOWN)
+  elevator               TriState             @default(UNKNOWN)
+  balcony                TriState             @default(UNKNOWN)
+  airConditioning        TriState             @default(UNKNOWN)
+  storage                TriState             @default(UNKNOWN)
+  quietCourtyardSignal   TriState             @default(UNKNOWN)
+  newerOrRenovatedSignal TriState             @default(UNKNOWN)
+  heatingType            HeatingType          @default(UNKNOWN)
+  energyRating           String?
+
+  description   String?
+  photos        String[] @default([])
+  contactMethod String?
+
+  status          ListingStatus @default(NEW)
+  rejectionReason String?
+
+  duplicateClusterId String?
+  duplicateCluster   DuplicateCluster? @relation(fields: [duplicateClusterId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  snapshots        ListingSnapshot[]
+  commuteEstimates CommuteEstimate[]
+  scoreBreakdown   ScoreBreakdown?
+  watchlistItems   WatchlistItem[]
+  notes            Note[]
+  notificationLog  NotificationLog[]
+
+  @@unique([providerId, sourceListingId])
+  @@index([providerId])
+  @@index([status])
+  @@index([district])
+  @@index([monthlyKnownCost])
+  @@index([duplicateClusterId])
+}
+
+model ListingSnapshot {
+  id            String             @id @default(cuid())
+  listingId     String
+  listing       Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  capturedAt    DateTime           @default(now())
+  changeType    SnapshotChangeType
+  fields        Json
+  rawSnapshot   Json?
+  changeSummary String?
+
+  @@index([listingId])
+}
+
+model DuplicateCluster {
+  id               String   @id @default(cuid())
+  primaryListingId String?
+  reason           String?
+  createdAt        DateTime @default(now())
+
+  listings Listing[]
+}
+
+// ---------------------------------------------------------------------------
+// Commute & scoring
+// ---------------------------------------------------------------------------
+
+model CommuteEstimate {
+  id              String        @id @default(cuid())
+  listingId       String
+  listing         Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  provider        String
+  originLat       Float
+  originLng       Float
+  destLat         Float
+  destLng         Float
+  durationMinutes Int?
+  walkingMinutes  Int?
+  transfers       Int?
+  routeSummary    String?
+  rating          CommuteRating @default(NOT_CALCULATED)
+  calculatedAt    DateTime      @default(now())
+
+  @@index([listingId])
+}
+
+model ScoreBreakdown {
+  id               String   @id @default(cuid())
+  listingId        String   @unique
+  listing          Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  totalScore       Int
+  dataCompleteness Int      @default(0)
+  isZeroed         Boolean  @default(false)
+  zeroReason       String?
+  categories       Json
+  weightsSnapshot  Json
+  calculatedAt     DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// User workflow
+// ---------------------------------------------------------------------------
+
+model WatchlistItem {
+  id                   String    @id @default(cuid())
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId            String
+  listing              Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  addedAt              DateTime  @default(now())
+  notifyOnPriceChange  Boolean   @default(true)
+  notifyOnStatusChange Boolean   @default(true)
+  lastNotifiedAt       DateTime?
+  scheduledViewingAt   DateTime?
+
+  @@unique([userId, listingId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([listingId])
+}
+
+model NotificationLog {
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId    String?
+  listing      Listing?            @relation(fields: [listingId], references: [id])
+  dedupeKey    String              @unique
+  channel      NotificationChannel
+  type         NotificationType
+  payload      Json
+  status       NotificationStatus  @default(PENDING)
+  errorMessage String?
+  sentAt       DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([listingId])
+}

@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: appscanner
+      POSTGRES_PASSWORD: appscanner
+      POSTGRES_DB: appscanner
+    ports:
+      - "5432:5432"
+    volumes:
+      - appscanner_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appscanner"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-e2e:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: appscanner
+      POSTGRES_PASSWORD: appscanner
+      POSTGRES_DB: appscanner_e2e
+    ports:
+      - "5433:5432"
+    volumes:
+      - appscanner_e2e_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appscanner -d appscanner_e2e"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  appscanner_pgdata:
+  appscanner_e2e_pgdata:

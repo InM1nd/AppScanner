@@ -1,0 +1,257 @@
+{
+  "_comment": "Fictional demo data in NormalizedListing shape (src/types/listing.ts). Load with `npx tsx scripts/import-fixture.ts` or paste individual entries through the Import UI's manual form. Nothing here was scraped.",
+  "listings": [
+    {
+      "title": "[FIXTURE] 2-Zimmer-Wohnung, Fünfhaus",
+      "sourceListingId": "fixture-0001",
+      "canonicalUrl": "https://example-listings.at/fixture-0001",
+      "importMethod": "URL_METADATA",
+      "createdAtSource": null,
+      "listingType": "RENTAL",
+      "city": "Wien",
+      "address": "Reindorfgasse 12, 1150 Wien",
+      "postalCode": "1150",
+      "district": 15,
+      "latitude": 48.192,
+      "longitude": 16.339,
+      "rooms": 2,
+      "squareMeters": 60,
+      "hasSeparateBedroom": "YES",
+      "furnishedLevel": "UNFURNISHED",
+      "baseRent": {
+        "amount": 780,
+        "confidence": "EXACT",
+        "sourceText": "Listed base rent"
+      },
+      "operatingCosts": {
+        "amount": 145,
+        "confidence": "EXACT",
+        "sourceText": "Betriebskosten laut Exposé"
+      },
+      "heatingCost": {
+        "amount": 55,
+        "confidence": "ESTIMATE",
+        "sourceText": "Estimated from building type"
+      },
+      "hotWaterCost": {
+        "amount": 25,
+        "confidence": "ESTIMATE",
+        "sourceText": "Estimated"
+      },
+      "electricityEstimate": {
+        "amount": 70,
+        "confidence": "ESTIMATE",
+        "sourceText": "Market estimate"
+      },
+      "internetEstimate": {
+        "amount": 30,
+        "confidence": "ESTIMATE",
+        "sourceText": "Market estimate"
+      },
+      "parkingMonthlyCost": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "deposit": {
+        "amount": 2340,
+        "confidence": "EXACT",
+        "sourceText": "3 Monatsmieten"
+      },
+      "commission": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "contractFee": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "availabilityDate": "2026-09-15",
+      "contractType": "UNLIMITED",
+      "kitchen": "FITTED",
+      "washingMachine": "MACHINE_INCLUDED",
+      "parkingAvailability": "NONE",
+      "elevator": "YES",
+      "balcony": "YES",
+      "airConditioning": "NO",
+      "storage": "YES",
+      "quietCourtyardSignal": "YES",
+      "newerOrRenovatedSignal": "NO",
+      "heatingType": "DISTRICT",
+      "energyRating": "C",
+      "description": "[FIXTURE] Beispieldaten für Import-Tests, keine echte Wohnung.",
+      "photos": [],
+      "contactMethod": "fixture@example.com"
+    },
+    {
+      "title": "[FIXTURE] Provisionsfreie Wohnung, Ottakring",
+      "sourceListingId": "fixture-0002",
+      "canonicalUrl": "https://example-listings.at/fixture-0002",
+      "importMethod": "URL_METADATA",
+      "createdAtSource": null,
+      "listingType": "RENTAL",
+      "city": "Wien",
+      "address": "Wattgasse 40, 1160 Wien",
+      "postalCode": "1160",
+      "district": 16,
+      "latitude": 48.211,
+      "longitude": 16.325,
+      "rooms": 2.5,
+      "squareMeters": 64,
+      "hasSeparateBedroom": "YES",
+      "furnishedLevel": "UNFURNISHED",
+      "baseRent": {
+        "amount": 810,
+        "confidence": "EXACT",
+        "sourceText": "Listed base rent"
+      },
+      "operatingCosts": {
+        "amount": 120,
+        "confidence": "EXACT",
+        "sourceText": "Betriebskosten"
+      },
+      "heatingCost": {
+        "amount": 45,
+        "confidence": "EXACT",
+        "sourceText": "Heizkosten"
+      },
+      "hotWaterCost": {
+        "amount": 20,
+        "confidence": "EXACT",
+        "sourceText": "Warmwasser"
+      },
+      "electricityEstimate": {
+        "amount": 65,
+        "confidence": "ESTIMATE",
+        "sourceText": "Market estimate"
+      },
+      "internetEstimate": {
+        "amount": 30,
+        "confidence": "ESTIMATE",
+        "sourceText": "Market estimate"
+      },
+      "parkingMonthlyCost": {
+        "amount": 0,
+        "confidence": "EXACT",
+        "sourceText": "No parking"
+      },
+      "deposit": {
+        "amount": 1620,
+        "confidence": "EXACT",
+        "sourceText": "2 Monatsmieten"
+      },
+      "commission": {
+        "amount": 0,
+        "confidence": "EXACT",
+        "sourceText": "Provisionsfrei"
+      },
+      "contractFee": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "availabilityDate": "2026-09-22",
+      "contractType": "UNLIMITED",
+      "kitchen": "FITTED",
+      "washingMachine": "CONNECTION_ONLY",
+      "parkingAvailability": "NONE",
+      "elevator": "NO",
+      "balcony": "NO",
+      "airConditioning": "NO",
+      "storage": "UNKNOWN",
+      "quietCourtyardSignal": "UNKNOWN",
+      "newerOrRenovatedSignal": "YES",
+      "heatingType": "GAS",
+      "energyRating": "B",
+      "description": "[FIXTURE] Beispieldaten für Import-Tests, keine echte Wohnung.",
+      "photos": [],
+      "contactMethod": "fixture2@example.com"
+    },
+    {
+      "title": "[FIXTURE] Zimmer in Wohngemeinschaft (sollte 0 Punkte erhalten)",
+      "sourceListingId": "fixture-0003",
+      "canonicalUrl": "https://example-listings.at/fixture-0003",
+      "importMethod": "MANUAL",
+      "createdAtSource": null,
+      "listingType": "SHARED_ROOM",
+      "city": "Wien",
+      "address": "Burggasse 5, 1070 Wien",
+      "postalCode": "1070",
+      "district": 7,
+      "latitude": null,
+      "longitude": null,
+      "rooms": 1,
+      "squareMeters": 14,
+      "hasSeparateBedroom": "NO",
+      "furnishedLevel": "FURNISHED",
+      "baseRent": {
+        "amount": 420,
+        "confidence": "EXACT",
+        "sourceText": "Listed base rent"
+      },
+      "operatingCosts": {
+        "amount": 50,
+        "confidence": "EXACT",
+        "sourceText": "Betriebskosten"
+      },
+      "heatingCost": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "hotWaterCost": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "electricityEstimate": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "internetEstimate": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "parkingMonthlyCost": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "deposit": {
+        "amount": 840,
+        "confidence": "EXACT",
+        "sourceText": "2 Monatsmieten"
+      },
+      "commission": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "contractFee": {
+        "amount": null,
+        "confidence": "UNKNOWN",
+        "sourceText": null
+      },
+      "availabilityDate": "2026-09-01",
+      "contractType": "UNLIMITED",
+      "kitchen": "BASIC",
+      "washingMachine": "MACHINE_INCLUDED",
+      "parkingAvailability": "NONE",
+      "elevator": "NO",
+      "balcony": "NO",
+      "airConditioning": "NO",
+      "storage": "NO",
+      "quietCourtyardSignal": "UNKNOWN",
+      "newerOrRenovatedSignal": "UNKNOWN",
+      "heatingType": "UNKNOWN",
+      "energyRating": null,
+      "description": "[FIXTURE] WG-Zimmer, demonstriert die Ausschluss-Regel für Wohngemeinschaften.",
+      "photos": [],
+      "contactMethod": null
+    }
+  ]
+}
