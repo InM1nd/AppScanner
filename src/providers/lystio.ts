@@ -35,7 +35,11 @@ import {
   districtFromPostalCode,
   buildUrlOnlyDraft,
 } from "./shared/url-only-listing";
-import { stripHtml, detectAmenitySignal } from "./shared/text-signals";
+import {
+  stripHtml,
+  detectAmenitySignal,
+  detectHeatingType,
+} from "./shared/text-signals";
 
 const DOMAINS = ["lystio.at", "www.lystio.at"];
 const SOURCE_ID_PATTERN = /\/(\d+)(?:[/?#]|$)/;
@@ -70,22 +74,34 @@ function extractJsonLdGraph(html: string): JsonLdNode[] {
   return [];
 }
 
-function extractPriceBreakdown(html: string): Map<string, string> {
-  const map = new Map<string, string>();
-  const start = html.indexOf('id="price-breakdown"');
-  if (start === -1) return map;
-  const end = html.indexOf("</section>", start);
-  const section = html.slice(start, end === -1 ? undefined : end);
-  const re =
-    /ds-body-sm-regular ds-text-medium[^"]*">([^<]+)<\/span>.*?ds-body-sm-regular ds-text-high[^"]*">([^<]+)<\/span>/g;
-  for (const m of section.matchAll(re)) map.set(m[1].trim(), m[2].trim());
-  return map;
+function extractPriceBreakdown($: cheerio.CheerioAPI) {
+  const values = new Map<string, string>();
+  const section = $("#price-breakdown");
+  section.find("span.ds-body-sm-regular.ds-text-medium").each((_, el) => {
+    const label = $(el).text().trim();
+    const value = $(el)
+      .closest("div")
+      .find("span.ds-body-sm-regular.ds-text-high")
+      .last()
+      .text()
+      .trim();
+    if (label && value) values.set(label, value);
+  });
+  return {
+    total: section
+      .find("header span.ds-heading-sm-semi-bold")
+      .first()
+      .text()
+      .trim(),
+    values,
+  };
 }
 
-function parseLystioListing(
+export function parseLystioListing(
   html: string,
   fallbackUrl: string,
 ): NormalizedListing {
+  const $ = cheerio.load(html);
   const graph = extractJsonLdGraph(html);
   const listing = graph.find((n) => n["@type"] === "RealEstateListing");
   if (!listing) {
@@ -130,14 +146,32 @@ function parseLystioListing(
     typeof listing.url === "string" ? listing.url : fallbackUrl
   ).match(SOURCE_ID_PATTERN);
 
-  const costs = extractPriceBreakdown(html);
-  const rent = parseEnglishEuroAmount(costs.get("Rent"));
-  const operating = parseEnglishEuroAmount(costs.get("Operating costs"));
-  const deposit = parseEnglishEuroAmount(costs.get("Security Deposit"));
+  const costs = extractPriceBreakdown($);
+  const rentLabel = costs.values.has("Base rent") ? "Base rent" : "Rent";
+  const rentRaw = costs.values.get(rentLabel);
+  const operatingRaw = costs.values.get("Operating costs");
+  const depositRaw = costs.values.get("Security Deposit");
+  const totalRaw = costs.total || undefined;
+  const rent = parseEnglishEuroAmount(rentRaw);
+  const operating = parseEnglishEuroAmount(operatingRaw);
+  const deposit = parseEnglishEuroAmount(depositRaw);
+  const offerPrice = typeof offers?.price === "number" ? offers.price : null;
+  const advertisedTotal = parseEnglishEuroAmount(totalRaw) ?? offerPrice;
+  const componentsReconcile =
+    advertisedTotal === null ||
+    rent === null ||
+    operating === null ||
+    Math.abs(rent + operating - advertisedTotal) <= 0.02;
 
-  const description =
+  const jsonDescription =
     typeof listing.description === "string" ? listing.description : null;
-  const combinedText = `${description ?? ""} ${typeof listing.name === "string" ? listing.name : ""}`;
+  const description =
+    stripHtml($("#description p").text()) ?? stripHtml(jsonDescription);
+  const quickDetails = $("#quick-details").text();
+  const keyInformation = $("#key-information").text();
+  const amenities = $("#amenities").text();
+  const combinedText = `${description ?? ""} ${quickDetails} ${keyInformation} ${amenities} ${typeof listing.name === "string" ? listing.name : ""}`;
+  const evidence = combinedText.toLowerCase();
 
   return {
     ...blankNormalizedListing,
@@ -156,24 +190,68 @@ function parseLystioListing(
     longitude,
     rooms,
     squareMeters,
+    advertisedMonthlyTotal:
+      advertisedTotal !== null
+        ? exactFact(
+            advertisedTotal,
+            totalRaw
+              ? `Lystio price breakdown: advertised total (${totalRaw})`
+              : `Lystio JSON-LD Offer price (${offerPrice})`,
+          )
+        : unknownFact,
     baseRent:
-      rent !== null
-        ? exactFact(rent, `Lystio price breakdown: Rent (${costs.get("Rent")})`)
+      rent !== null && componentsReconcile
+        ? exactFact(rent, `Lystio price breakdown: ${rentLabel} (${rentRaw})`)
         : unknownFact,
     operatingCosts:
-      operating !== null
+      operating !== null && componentsReconcile
         ? exactFact(
             operating,
-            `Lystio price breakdown: Operating costs (${costs.get("Operating costs")})`,
+            `Lystio price breakdown: Operating costs (${operatingRaw})`,
           )
         : unknownFact,
     deposit:
       deposit !== null
         ? exactFact(
             deposit,
-            `Lystio price breakdown: Security Deposit (${costs.get("Security Deposit")})`,
+            `Lystio price breakdown: Security Deposit (${depositRaw})`,
           )
         : unknownFact,
+    hasSeparateBedroom: /\bbedroom\b/.test(evidence) ? "YES" : "UNKNOWN",
+    furnishedLevel: /kitchen only furnished|partly furnished/.test(evidence)
+      ? "PARTLY_FURNISHED"
+      : /unfurnished/.test(evidence)
+        ? "UNFURNISHED"
+        : /furnished/.test(evidence)
+          ? "FURNISHED"
+          : "UNKNOWN",
+    kitchen: /no kitchen/.test(evidence)
+      ? "NONE"
+      : /fitted kitchen|kitchen only furnished|built-in kitchen/.test(evidence)
+        ? "FITTED"
+        : /\bkitchen\b/.test(evidence)
+          ? "BASIC"
+          : "UNKNOWN",
+    washingMachine:
+      /washing machine (?:connection|hookup)|connection for (?:a )?washing machine/.test(
+        evidence,
+      )
+        ? "CONNECTION_ONLY"
+        : /no washing machine/.test(evidence)
+          ? "NONE"
+          : /washing machine/.test(evidence)
+            ? "MACHINE_INCLUDED"
+            : "UNKNOWN",
+    contractType: /holiday apartment|short-term|short term/.test(evidence)
+      ? "TEMPORARY"
+      : /fixed contract|fixed-term|\d+ years?/.test(
+            keyInformation.toLowerCase(),
+          )
+        ? "FIXED_TERM"
+        : /unlimited|indefinite/.test(keyInformation.toLowerCase())
+          ? "UNLIMITED"
+          : "UNKNOWN",
+    heatingType: detectHeatingType(keyInformation),
     elevator: detectAmenitySignal(combinedText, ["elevator", "lift"]),
     storage: detectAmenitySignal(combinedText, [
       "cellar",
@@ -185,7 +263,13 @@ function parseLystioListing(
       "loggia",
       "terrace",
     ]),
-    description: stripHtml(description),
+    airConditioning: detectAmenitySignal(combinedText, ["air conditioning"]),
+    quietCourtyardSignal:
+      /quiet/.test(evidence) && /courtyard/.test(evidence) ? "YES" : "UNKNOWN",
+    newerOrRenovatedSignal: /new build|newly built|renovated/.test(evidence)
+      ? "YES"
+      : "UNKNOWN",
+    description,
     photos: images,
   };
 }

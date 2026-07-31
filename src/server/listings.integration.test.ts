@@ -41,7 +41,7 @@ function draft(
   };
 }
 
-describe("listing persistence contract", () => {
+describe("V15 listing persistence contract", () => {
   beforeAll(async () => void (await getOwnerUser()));
   afterAll(async () => {
     await db.listing.deleteMany({ where: { id: { in: createdIds } } });

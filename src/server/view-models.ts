@@ -24,6 +24,7 @@ function serializeMoneyFields<T extends Record<string, unknown>>(listing: T) {
 
 export type ListingCardVM = Omit<
   ListingCard,
+  | "advertisedMonthlyTotalAmount"
   | "baseRentAmount"
   | "operatingCostsAmount"
   | "heatingCostAmount"
@@ -40,6 +41,7 @@ export type ListingCardVM = Omit<
   | "upfrontCostEstimate"
   | "upfrontKnownTotal"
 > & {
+  advertisedMonthlyTotalAmount: number | null;
   baseRentAmount: number | null;
   operatingCostsAmount: number | null;
   heatingCostAmount: number | null;

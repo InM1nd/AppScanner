@@ -6,6 +6,7 @@ import type { FinancialFact } from "@/types/listing";
 import { toNum } from "./decimal";
 
 export const MONEY_FIELDS = [
+  "advertisedMonthlyTotal",
   "baseRent",
   "operatingCosts",
   "heatingCost",

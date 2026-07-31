@@ -309,6 +309,10 @@ model Listing {
   furnishedLevel     FurnishedLevel @default(UNKNOWN)
 
   // Financials — each field: amount + confidence + free-text source explanation.
+  advertisedMonthlyTotalAmount     Decimal?            @db.Decimal(10, 2)
+  advertisedMonthlyTotalConfidence FinancialConfidence @default(UNKNOWN)
+  advertisedMonthlyTotalSourceText String?
+
   baseRentAmount     Decimal?            @db.Decimal(10, 2)
   baseRentConfidence FinancialConfidence @default(UNKNOWN)
   baseRentSourceText String?

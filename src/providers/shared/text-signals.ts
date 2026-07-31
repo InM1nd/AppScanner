@@ -12,7 +12,9 @@ export function parseEuroAmount(raw: string | null | undefined): number | null {
   if (!cleaned) return null;
   const normalized = cleaned.includes(",")
     ? cleaned.replace(/\./g, "").replace(",", ".")
-    : cleaned;
+    : /^-?\d{1,3}(?:\.\d{3})+$/.test(cleaned)
+      ? cleaned.replace(/\./g, "")
+      : cleaned;
   const n = Number(normalized);
   return Number.isFinite(n) ? n : null;
 }
@@ -23,15 +25,20 @@ export function stripHtml(html: string | null | undefined): string | null {
   return text || null;
 }
 
-// ponytail: keyword-in-text heuristic — a phrase like "kein Balkon" would
-// false-positive as YES. Good enough for a personal-use draft the user
-// reviews before saving; upgrade to a structured per-site field if that bites.
 export function detectAmenitySignal(
   text: string | null | undefined,
   keywords: string[],
 ): TriState {
   if (!text) return "UNKNOWN";
   const lower = text.toLowerCase();
+  if (
+    keywords.some((keyword) =>
+      ["no ", "without ", "kein ", "keine ", "ohne "].some((prefix) =>
+        lower.includes(`${prefix}${keyword}`),
+      ),
+    )
+  )
+    return "NO";
   return keywords.some((k) => lower.includes(k)) ? "YES" : "UNKNOWN";
 }
 
@@ -40,11 +47,21 @@ export function detectHeatingType(
 ): HeatingType {
   if (!text) return "UNKNOWN";
   const lower = text.toLowerCase();
-  if (lower.includes("fernwärme")) return "DISTRICT";
-  if (lower.includes("fußbodenheizung")) return "FLOOR";
-  if (lower.includes("gasheizung") || lower.includes("gasetagenheizung"))
+  if (lower.includes("fernwärme") || lower.includes("district heating"))
+    return "DISTRICT";
+  if (lower.includes("fußbodenheizung") || lower.includes("floor heating"))
+    return "FLOOR";
+  if (
+    lower.includes("gasheizung") ||
+    lower.includes("gasetagenheizung") ||
+    lower.includes("gas heating")
+  )
     return "GAS";
-  if (lower.includes("elektroheizung") || lower.includes("nachtspeicher"))
+  if (
+    lower.includes("elektroheizung") ||
+    lower.includes("nachtspeicher") ||
+    lower.includes("electric heating")
+  )
     return "ELECTRIC";
   if (lower.includes("heizung")) return "OTHER";
   return "UNKNOWN";

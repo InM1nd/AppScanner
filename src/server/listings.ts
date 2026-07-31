@@ -82,6 +82,7 @@ function draftToListingFields(draft: NormalizedListing) {
     hasSeparateBedroom: draft.hasSeparateBedroom,
     furnishedLevel: draft.furnishedLevel,
     ...factsToColumns({
+      advertisedMonthlyTotal: draft.advertisedMonthlyTotal,
       baseRent: draft.baseRent,
       operatingCosts: draft.operatingCosts,
       heatingCost: draft.heatingCost,
@@ -129,6 +130,7 @@ function draftToSparseListingFields(
   return {
     ...sparse,
     ...factsToSparseColumns({
+      advertisedMonthlyTotal: draft.advertisedMonthlyTotal,
       baseRent: draft.baseRent,
       operatingCosts: draft.operatingCosts,
       heatingCost: draft.heatingCost,

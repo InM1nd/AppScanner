@@ -14,6 +14,7 @@ import { AlertTriangle } from "lucide-react";
 import { useTranslations } from "@/i18n/locale-context";
 
 const MONEY_FIELDS: { key: keyof NormalizedListing; label: string }[] = [
+  { key: "advertisedMonthlyTotal", label: "Advertised monthly total" },
   { key: "baseRent", label: "Base rent" },
   { key: "operatingCosts", label: "Operating costs (BK)" },
   { key: "heatingCost", label: "Heating" },

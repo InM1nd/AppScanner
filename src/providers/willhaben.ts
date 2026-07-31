@@ -80,26 +80,20 @@ function moneyFact(
     : unknownFact;
 }
 
-// Not every listing has the net/cold-rent breakdown (RENTAL_PRICE/PER_MONTH_NET)
-// — Genossenschaft and shared-room listings especially often only carry the
-// generic RENTAL_PRICE/PER_MONTH or PRICE attribute instead. Fall through in
-// order of specificity rather than leaving baseRent UNKNOWN when a real
-// figure is right there.
-function rentFact(attrs: Record<string, string[]>): FinancialFact {
-  const net = first(attrs, "RENTAL_PRICE/PER_MONTH_NET");
-  if (net) return moneyFact(net, "Nettomiete");
+function advertisedMonthlyTotalFact(
+  attrs: Record<string, string[]>,
+): FinancialFact {
+  const totalEncumbrance = first(attrs, "TOTAL_ENCUMBRANCE");
+  if (totalEncumbrance)
+    return moneyFact(totalEncumbrance, "TOTAL_ENCUMBRANCE (Gesamtbelastung)");
   const perMonth = first(attrs, "RENTAL_PRICE/PER_MONTH");
-  if (perMonth)
-    return moneyFact(
-      perMonth,
-      "RENTAL_PRICE/PER_MONTH (no net/gross split given)",
-    );
+  if (perMonth) return moneyFact(perMonth, "RENTAL_PRICE/PER_MONTH");
   const price = first(attrs, "PRICE");
-  if (price) return moneyFact(price, "PRICE (no rent breakdown given)");
+  if (price) return moneyFact(price, "PRICE");
   return unknownFact;
 }
 
-function parseWillhabenListing(
+export function parseWillhabenListing(
   html: string,
   fallbackUrl: string,
 ): NormalizedListing {
@@ -131,9 +125,19 @@ function parseWillhabenListing(
     .split(",")
     .map((v) => Number(v.trim()));
 
-  const preferencesAndFreeArea =
-    `${all(attrs, "ESTATE_PREFERENCE")} ${first(attrs, "FREE_AREA/FREE_AREA_TYPE") ?? ""}`.toLowerCase();
+  const description = stripHtml(
+    [
+      first(attrs, "DESCRIPTION"),
+      first(attrs, "GENERAL_TEXT_ADVERT/Ausstattung"),
+      first(attrs, "GENERAL_TEXT_ADVERT/Lage"),
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  );
+  const preferencesAndFreeArea = `${all(attrs, "ESTATE_PREFERENCE")} ${first(attrs, "FREE_AREA/FREE_AREA_TYPE") ?? ""}`;
   const heatingText = `${first(attrs, "HEATING") ?? ""} ${first(attrs, "GENERAL_TEXT_ADVERT/Ausstattung") ?? ""}`;
+  const evidence =
+    `${preferencesAndFreeArea} ${description ?? ""}`.toLowerCase();
 
   const canonicalUrl: string =
     advertDetails.seoMetaData?.canonicalUrl || fallbackUrl;
@@ -149,7 +153,12 @@ function parseWillhabenListing(
     sourceListingId: advertDetails.id != null ? String(advertDetails.id) : null,
     canonicalUrl,
     importMethod: "URL_METADATA",
-    listingType: "RENTAL",
+    listingType:
+      /wg-zimmer|wohngemeinschaft|shared apartment|zimmer in (?:einer )?wg/.test(
+        `${title} ${evidence}`.toLowerCase(),
+      )
+        ? "SHARED_ROOM"
+        : "RENTAL",
     address: addressLines.join(", ") || null,
     postalCode,
     district: districtFromPostalCode(postalCode),
@@ -161,39 +170,81 @@ function parseWillhabenListing(
     squareMeters: first(attrs, "ESTATE_SIZE")
       ? Number(first(attrs, "ESTATE_SIZE")!.replace(",", "."))
       : null,
-    baseRent: rentFact(attrs),
+    advertisedMonthlyTotal: advertisedMonthlyTotalFact(attrs),
+    // PER_MONTH_NET is a net monthly total on current Willhaben pages, not
+    // a reliable cold/base-rent component. Keep base rent unknown.
+    baseRent: unknownFact,
     operatingCosts: moneyFact(
       first(attrs, "RENTAL_PRICE/ADDITIONAL_COST_NET"),
       "Betriebskosten",
     ),
     deposit: moneyFact(first(attrs, "ADDITIONAL_COST/DEPOSIT"), "Kaution"),
-    commission: feeText
-      ? {
-          amount: null,
-          confidence: "UNKNOWN",
-          sourceText: `Willhaben: ${feeText}`,
-        }
-      : unknownFact,
+    commission: /provisionsfrei|keine provision|abgeber zahlt/i.test(
+      `${feeText ?? ""} ${description ?? ""}`,
+    )
+      ? exactFact(0, `Willhaben: ${feeText ?? "provisionsfrei"}`)
+      : feeText
+        ? {
+            amount: null,
+            confidence: "UNKNOWN",
+            sourceText: `Willhaben: ${feeText}`,
+          }
+        : unknownFact,
     availabilityDate: parseGermanDate(first(attrs, "AVAILABLE_DATE")),
     contractType: detectContractType(first(attrs, "DURATION/HASTERMLIMIT")),
     energyRating: first(attrs, "ENERGY_HWB_CLASS") ?? null,
     heatingType: detectHeatingType(heatingText),
-    elevator: preferencesAndFreeArea.includes("fahrstuhl") ? "YES" : "UNKNOWN",
+    hasSeparateBedroom: /kein(?:e|en)? separates? schlafzimmer/.test(evidence)
+      ? "NO"
+      : /\bschlafzimmer\b/.test(evidence)
+        ? "YES"
+        : "UNKNOWN",
+    furnishedLevel: /unmöbliert/.test(evidence)
+      ? "UNFURNISHED"
+      : /teilmöbliert|teilweise möbliert/.test(evidence)
+        ? "PARTLY_FURNISHED"
+        : /möbliert/.test(evidence)
+          ? "FURNISHED"
+          : "UNKNOWN",
+    kitchen: /keine küche/.test(evidence)
+      ? "NONE"
+      : /einbauküche/.test(evidence)
+        ? "FITTED"
+        : /\bküche\b|küchenzeile/.test(evidence)
+          ? "BASIC"
+          : "UNKNOWN",
+    washingMachine: /waschmaschinenanschluss|waschmaschinenanschluß/.test(
+      evidence,
+    )
+      ? "CONNECTION_ONLY"
+      : /keine waschmaschine/.test(evidence)
+        ? "NONE"
+        : /\bwaschmaschine\b/.test(evidence)
+          ? "MACHINE_INCLUDED"
+          : "UNKNOWN",
+    elevator:
+      evidence.includes("fahrstuhl") || evidence.includes("aufzug")
+        ? "YES"
+        : "UNKNOWN",
     storage:
-      preferencesAndFreeArea.includes("abstellraum") ||
-      preferencesAndFreeArea.includes("keller")
+      evidence.includes("abstellraum") || evidence.includes("keller")
         ? "YES"
         : "UNKNOWN",
     balcony:
-      preferencesAndFreeArea.includes("balkon") ||
-      preferencesAndFreeArea.includes("terrasse")
+      evidence.includes("balkon") || evidence.includes("terrasse")
         ? "YES"
         : "UNKNOWN",
-    description: stripHtml(
-      [first(attrs, "DESCRIPTION"), first(attrs, "GENERAL_TEXT_ADVERT/Lage")]
-        .filter(Boolean)
-        .join("\n\n"),
-    ),
+    airConditioning: /klimaanlage/.test(evidence) ? "YES" : "UNKNOWN",
+    quietCourtyardSignal:
+      /ruhig/.test(evidence) && /innenhof|hofseitig|hofseite/.test(evidence)
+        ? "YES"
+        : "UNKNOWN",
+    newerOrRenovatedSignal: /erstbezug|neubau|frisch renoviert|saniert/.test(
+      evidence,
+    )
+      ? "YES"
+      : "UNKNOWN",
+    description,
     photos: images,
   };
 }

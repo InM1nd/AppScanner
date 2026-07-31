@@ -64,6 +64,7 @@ export const normalizedListing = z.object({
   hasSeparateBedroom: TriState,
   furnishedLevel: FurnishedLevel,
 
+  advertisedMonthlyTotal: financialFact,
   baseRent: financialFact,
   operatingCosts: financialFact,
   heatingCost: financialFact,
@@ -115,6 +116,7 @@ export const blankNormalizedListing: NormalizedListing = {
   squareMeters: null,
   hasSeparateBedroom: "UNKNOWN",
   furnishedLevel: "UNKNOWN",
+  advertisedMonthlyTotal: unknownFact,
   baseRent: unknownFact,
   operatingCosts: unknownFact,
   heatingCost: unknownFact,

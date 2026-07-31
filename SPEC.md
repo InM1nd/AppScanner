@@ -18,6 +18,7 @@ Private production-ready Vienna rental decision tool: safe ingestion, correct co
 - I.commute: mock source explicit and capped at 50% commute weight.
 - I.notify: strong match requires score>=70, completeness>=70, not excluded; digest 08:00 Europe/Vienna.
 - I.refresh: source disappearance changes availability, never deletes listing.
+- I.provider: Willhaben/Lystio extract only structured fields or explicit provider-scoped evidence; provenance remains attached.
 
 # §V
 
@@ -32,6 +33,10 @@ Private production-ready Vienna rental decision tool: safe ingestion, correct co
 - V9: Production pages/actions require owner auth; direct production job routes cannot execute work.
 - V10: E2E only runs against database ending `_e2e`.
 - V11: Mobile 320/390px has no horizontal overflow; core flows keyboard accessible and WCAG AA.
+- V12: Provider parsers confirm layout, amenities, and contract facts only from explicit evidence; connection-only is not an included appliance and room count alone does not confirm a separate bedroom.
+- V13: Parsed rent components preserve their provider labels and reconcile with an advertised total within €0.02 when both are present; ambiguous components remain UNKNOWN.
+- V14: Austrian euro parsing treats a single three-digit group after `.` as a thousands group (`2.850` = €2,850), while decimal forms remain decimal.
+- V15: The integration-test runner loads the same local env contract as the app before importing auth or database modules.
 
 # §T
 
@@ -45,7 +50,10 @@ T6|x|jobs/providers: durable bounded Inngest + health|V5,V6,V7
 T7|x|Telegram actionable triggers/dedupe/reminders/digest|V8
 T8|x|UX/UI: decision strip + dashboard/list/mobile/detail/import/compare/settings|V3,V4,V11
 T9|>|full verification complete; external production handoff pending credentials|V1,V2,V3,V4,V5,V6,V7,V8,V9,V10,V11
+T10|x|Willhaben/Lystio structured enrichment + offline contract fixtures|V1,V2,V3,V12,V13,I.cost,I.score,I.provider
 
 # §B
 
 id|date|cause|fix
+B1|2026-07-31|German amount `2.850` was interpreted as decimal €2.85 because dot-only input bypassed thousands normalization|V14
+B2|2026-07-31|Integration Vitest config did not load `.env`, leaving owner email and PostgreSQL password undefined|V15

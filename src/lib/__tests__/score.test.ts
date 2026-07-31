@@ -54,6 +54,7 @@ function goodListing(
 
 function goodCost(baseRent = 700) {
   return computeCost({
+    advertisedMonthlyTotal: unknownFact,
     baseRent: exactFact(baseRent),
     operatingCosts: exactFact(100),
     heatingCost: exactFact(30),
@@ -151,6 +152,7 @@ describe("computeScore", () => {
 
   it("gives no budget points while any recurring all-in field is unknown", () => {
     const incomplete = computeCost({
+      advertisedMonthlyTotal: unknownFact,
       baseRent: exactFact(700),
       operatingCosts: exactFact(100),
       heatingCost: unknownFact,
@@ -207,6 +209,7 @@ describe("computeScore", () => {
   it("makes the no-commission preference affect scoring", () => {
     const withCommission = computeCost({
       ...{
+        advertisedMonthlyTotal: unknownFact,
         baseRent: exactFact(700),
         operatingCosts: exactFact(100),
         heatingCost: exactFact(30),

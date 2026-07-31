@@ -11,6 +11,7 @@ describe("factsToSparseColumns", () => {
     };
     const facts = Object.fromEntries(
       [
+        "advertisedMonthlyTotal",
         "baseRent",
         "operatingCosts",
         "heatingCost",

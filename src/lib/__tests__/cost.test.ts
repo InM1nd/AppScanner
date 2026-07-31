@@ -10,6 +10,7 @@ import {
 function baseListing() {
   return {
     ...blankNormalizedListing,
+    advertisedMonthlyTotal: unknownFact,
     baseRent: exactFact(800),
     operatingCosts: exactFact(150),
     heatingCost: exactFact(50),
@@ -46,6 +47,19 @@ describe("computeCost", () => {
     expect(result.monthlyLikelyTotal).toBe(800 + 150 + 50 + 20 + 80 + 30);
     expect(result.electricityEstimate.amount).toBe(80);
     expect(result.internetEstimate.amount).toBe(30);
+  });
+
+  it("uses an advertised monthly total instead of double-counting rent components", () => {
+    const result = computeCost({
+      ...baseListing(),
+      advertisedMonthlyTotal: exactFact(950),
+      baseRent: exactFact(863),
+      operatingCosts: exactFact(87),
+    });
+    expect(result.housingSubtotal).toBe(950 + 50 + 20);
+    expect(result.monthlyLikelyTotal).toBe(950 + 50 + 20 + 80 + 30);
+    expect(result.unknownRecurringFields).not.toContain("baseRent");
+    expect(result.unknownRecurringFields).not.toContain("operatingCosts");
   });
 
   it("flags cost over the absolute monthly max", () => {

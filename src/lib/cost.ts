@@ -5,6 +5,7 @@ import type { FinancialConfidence } from "@/types/enums";
 import type { FinancialFact, NormalizedListing } from "@/types/listing";
 
 const HOUSING_RECURRING_FIELDS = [
+  "advertisedMonthlyTotal",
   "baseRent",
   "operatingCosts",
   "heatingCost",
@@ -84,6 +85,7 @@ function isExact(
 export function computeCost(
   listing: Pick<
     NormalizedListing,
+    | "advertisedMonthlyTotal"
     | "baseRent"
     | "operatingCosts"
     | "heatingCost"
@@ -101,6 +103,7 @@ export function computeCost(
   absoluteMonthlyMax = 1100,
 ): CostBreakdown {
   const recurringFacts: Record<RecurringField, FinancialFact> = {
+    advertisedMonthlyTotal: listing.advertisedMonthlyTotal,
     baseRent: listing.baseRent,
     operatingCosts: listing.operatingCosts,
     heatingCost: listing.heatingCost,
@@ -109,8 +112,24 @@ export function computeCost(
     electricityEstimate: listing.electricityEstimate,
     internetEstimate: listing.internetEstimate,
   };
+  const housingFields: HousingRecurringField[] = isKnown(
+    listing.advertisedMonthlyTotal,
+  )
+    ? [
+        "advertisedMonthlyTotal",
+        "heatingCost",
+        "hotWaterCost",
+        "parkingMonthlyCost",
+      ]
+    : [
+        "baseRent",
+        "operatingCosts",
+        "heatingCost",
+        "hotWaterCost",
+        "parkingMonthlyCost",
+      ];
   const activeRecurringFields = [
-    ...HOUSING_RECURRING_FIELDS,
+    ...housingFields,
     ...UTILITY_RECURRING_FIELDS,
   ].filter(
     (field) =>
@@ -172,7 +191,7 @@ export function computeCost(
     ? listing.contractFee.amount
     : null;
   const grossMonthlyRentForDepositCheck =
-    monthlyLikelyTotal ||
+    housingSubtotal ||
     (isKnown(listing.baseRent) ? listing.baseRent.amount : 0);
 
   const redFlags: CostRedFlag[] = [];

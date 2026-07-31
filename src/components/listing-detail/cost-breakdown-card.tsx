@@ -15,6 +15,7 @@ const RED_FLAG_LABELS: Record<CostRedFlag, string> = {
 };
 
 const MONEY_LABELS: Record<string, string> = {
+  advertisedMonthlyTotal: "Advertised monthly total",
   baseRent: "Base rent",
   operatingCosts: "Operating costs (BK)",
   heatingCost: "Heating",
