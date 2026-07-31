@@ -22,6 +22,7 @@
     "test:e2e:guard": "tsx scripts/check-e2e-database.ts",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:bootstrap": "tsx prisma/bootstrap.ts",
     "db:e2e:migrate": "npm run test:e2e:guard && prisma migrate deploy",
     "db:e2e:seed": "npm run test:e2e:guard && npm run db:seed",
     "db:seed": "tsx prisma/seed.ts",

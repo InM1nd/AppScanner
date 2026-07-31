@@ -16,16 +16,7 @@ import {
 } from "../src/types/listing";
 import type { NormalizedListing } from "../src/types/listing";
 import type { ProviderName } from "../src/types/enums";
-
-const PROVIDERS: { name: ProviderName; displayName: string }[] = [
-  { name: "WILLHABEN", displayName: "Willhaben" },
-  { name: "IMMOSCOUT24_AT", displayName: "ImmoScout24 Austria" },
-  { name: "IMMOWELT_AT", displayName: "ImmoWelt Austria" },
-  { name: "DER_STANDARD", displayName: "Der Standard Immobilien" },
-  { name: "FINDMYHOME", displayName: "FindMyHome" },
-  { name: "GENERIC_URL", displayName: "Generic URL importer" },
-  { name: "MANUAL", displayName: "Manual entry" },
-];
+import { seedProviders } from "./providers";
 
 function draft(overrides: Partial<NormalizedListing>): NormalizedListing {
   return { ...blankNormalizedListing, ...overrides };
@@ -33,13 +24,7 @@ function draft(overrides: Partial<NormalizedListing>): NormalizedListing {
 
 async function main() {
   console.log("Seeding providers...");
-  for (const p of PROVIDERS) {
-    await db.provider.upsert({
-      where: { name: p.name },
-      update: {},
-      create: { name: p.name, displayName: p.displayName },
-    });
-  }
+  await seedProviders();
 
   console.log("Seeding user + default search profile...");
   const user = await getCurrentUser();
