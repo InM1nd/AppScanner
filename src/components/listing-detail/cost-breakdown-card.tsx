@@ -23,6 +23,12 @@ const MONEY_LABELS: Record<string, string> = {
   parkingMonthlyCost: "Parking",
 };
 
+function readAssumption(value: unknown, key: string): number | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const amount = (value as Record<string, unknown>)[key];
+  return typeof amount === "number" ? amount : null;
+}
+
 export function CostBreakdownCard({
   listing,
   title = "Financial breakdown",
@@ -39,6 +45,24 @@ export function CostBreakdownCard({
   const unknownUpfront = listing.unknownUpfrontFields.map((field) =>
     field.replace(/([A-Z])/g, " $1").toLowerCase(),
   );
+  const profileEstimates = [
+    {
+      label: "Energy (heating, hot water & electricity)",
+      amount: readAssumption(
+        listing.recurringEstimateAssumptions,
+        "profileEnergyEstimate",
+      ),
+    },
+    {
+      label: "Internet",
+      amount: readAssumption(
+        listing.recurringEstimateAssumptions,
+        "internetEstimate",
+      ),
+    },
+  ].filter(
+    (item): item is { label: string; amount: number } => item.amount !== null,
+  );
 
   return (
     <Card>
@@ -46,7 +70,7 @@ export function CostBreakdownCard({
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-3 text-center">
+        <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
           <div className="rounded-md bg-muted/50 p-3">
             <div className="text-[11px] text-muted-foreground uppercase tracking-wide">
               {knownMonthlyLabel}
@@ -103,6 +127,34 @@ export function CostBreakdownCard({
             );
           })}
         </div>
+
+        {profileEstimates.length > 0 ? (
+          <div className="rounded-md border border-primary/25 bg-primary/5 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium">Applied profile estimates</p>
+              <Badge variant="outline" className="text-[10px]">
+                likely total only
+              </Badge>
+            </div>
+            <div className="mt-2 space-y-1.5 text-sm">
+              {profileEstimates.map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span className="text-muted-foreground">{item.label}</span>
+                  <span className="font-medium tabular-nums">
+                    {formatEur(item.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Used because the advert has no matching cost. Source facts above
+              stay unchanged and should still be confirmed.
+            </p>
+          </div>
+        ) : null}
 
         {listing.unknownRecurringFields.length > 0 && (
           <p className="text-xs text-muted-foreground">

@@ -51,6 +51,8 @@ export function toDomainSearchProfile(
     targetMonthlyMin: toNum(profile.targetMonthlyMin) ?? 900,
     targetMonthlyMax: toNum(profile.targetMonthlyMax) ?? 1000,
     absoluteMonthlyMax: toNum(profile.absoluteMonthlyMax) ?? 1100,
+    energyMonthlyEstimate: toNum(profile.energyMonthlyEstimate) ?? 130,
+    internetMonthlyEstimate: toNum(profile.internetMonthlyEstimate) ?? 30,
     moveInEarliest: profile.moveInEarliest,
     moveInLatest: profile.moveInLatest,
     needsFittedKitchen: profile.needsFittedKitchen,

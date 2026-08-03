@@ -174,6 +174,37 @@ describe("computeScore", () => {
     expect(result.dataCompleteness).toBeLessThan(100);
   });
 
+  it("V17 scores profile estimates with half completeness credit", () => {
+    const cost = computeCost(
+      {
+        advertisedMonthlyTotal: exactFact(800),
+        baseRent: unknownFact,
+        operatingCosts: unknownFact,
+        heatingCost: unknownFact,
+        hotWaterCost: unknownFact,
+        electricityEstimate: unknownFact,
+        internetEstimate: unknownFact,
+        parkingMonthlyCost: unknownFact,
+        deposit: unknownFact,
+        commission: unknownFact,
+        contractFee: unknownFact,
+        parkingAvailability: "NONE",
+        furnishedLevel: "UNKNOWN",
+        availabilityDate: null,
+      },
+      1100,
+      { energyMonthlyEstimate: 130, internetMonthlyEstimate: 30 },
+    );
+    const result = computeScore(goodListing(), cost, route(15), profile);
+    const budget = result.categories.find(
+      (category) => category.key === "budget",
+    )!;
+
+    expect(budget.points).toBeGreaterThan(0);
+    expect(budget.sourceConfidence).toBe("ESTIMATE");
+    expect(budget.completeness).toBe(67);
+  });
+
   it("scales commute against the profile threshold and caps mock results at half weight", () => {
     const sixtyMinuteProfile = { ...profile, maxCommuteMinutes: 60 };
     const verified = computeScore(

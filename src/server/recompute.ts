@@ -9,6 +9,7 @@ import { computeCost } from "@/lib/cost";
 import { computeScore, type CommuteInput } from "@/lib/score";
 import { getActiveSearchProfile } from "./current-user";
 import { toScoreProfileInput } from "./search-profile-mapper";
+import { toNum } from "./decimal";
 
 class StaleRecomputeError extends Error {}
 import { factsFromRow } from "./listing-mapper";
@@ -38,6 +39,10 @@ export async function recomputeListing(
       availabilityDate: listing.availabilityDate,
     },
     scoreProfile.absoluteMonthlyMax,
+    {
+      energyMonthlyEstimate: toNum(profileRow.energyMonthlyEstimate) ?? 130,
+      internetMonthlyEstimate: toNum(profileRow.internetMonthlyEstimate) ?? 30,
+    },
   );
 
   const latestCommute =
@@ -95,6 +100,8 @@ export async function recomputeListing(
           monthlyLikelyTotal: cost.monthlyLikelyTotal,
           hasUnknownMandatoryCost: cost.hasUnknownMandatoryCost,
           unknownRecurringFields: cost.unknownRecurringFields,
+          recurringEstimateAssumptions:
+            cost.profileEstimateAssumptions as Prisma.InputJsonValue,
           upfrontCostEstimate: cost.upfrontCost.total,
           upfrontKnownTotal: cost.upfrontKnownTotal,
           hasUnknownUpfrontCost: cost.hasUnknownUpfrontCost,

@@ -50,4 +50,20 @@ describe("search profile validation", () => {
         .success,
     ).toBe(false);
   });
+
+  it("V16 defaults profile cost estimates and rejects negative values", () => {
+    const parsed = searchProfile.parse({
+      moveInEarliest: "2026-09-15",
+      moveInLatest: "2026-10-01",
+    });
+
+    expect(parsed.energyMonthlyEstimate).toBe(130);
+    expect(parsed.internetMonthlyEstimate).toBe(30);
+    expect(searchProfile.safeParse({ energyMonthlyEstimate: -1 }).success).toBe(
+      false,
+    );
+    expect(
+      searchProfile.safeParse({ internetMonthlyEstimate: -1 }).success,
+    ).toBe(false);
+  });
 });

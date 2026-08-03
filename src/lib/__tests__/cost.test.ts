@@ -142,4 +142,49 @@ describe("computeCost", () => {
     expect(result.hasUnknownUpfrontCost).toBe(true);
     expect(result.upfrontKnownTotal).toBe(result.monthlyKnownCost);
   });
+
+  it("V16 applies profile estimates only to unknown energy and internet without changing source facts", () => {
+    const listing = {
+      ...baseListing(),
+      heatingCost: unknownFact,
+      hotWaterCost: unknownFact,
+      electricityEstimate: unknownFact,
+      internetEstimate: unknownFact,
+    };
+    const result = computeCost(listing, 1100, {
+      energyMonthlyEstimate: 130,
+      internetMonthlyEstimate: 30,
+    });
+
+    expect(result.monthlyKnownCost).toBe(800 + 150);
+    expect(result.monthlyLikelyTotal).toBe(800 + 150 + 130 + 30);
+    expect(result.unknownRecurringFields).toEqual([]);
+    expect(result.profileEstimateAssumptions).toEqual({
+      profileEnergyEstimate: 130,
+      internetEstimate: 30,
+    });
+    expect(listing.heatingCost).toEqual(unknownFact);
+    expect(listing.electricityEstimate).toEqual(unknownFact);
+  });
+
+  it("V16 keeps partial energy data incomplete instead of double-counting a combined estimate", () => {
+    const result = computeCost(
+      {
+        ...baseListing(),
+        heatingCost: unknownFact,
+        hotWaterCost: unknownFact,
+        electricityEstimate: exactFact(60),
+        internetEstimate: unknownFact,
+      },
+      1100,
+      { energyMonthlyEstimate: 130, internetMonthlyEstimate: 30 },
+    );
+
+    expect(result.profileEstimateAssumptions).toEqual({ internetEstimate: 30 });
+    expect(result.unknownRecurringFields).toEqual([
+      "heatingCost",
+      "hotWaterCost",
+    ]);
+    expect(result.monthlyLikelyTotal).toBe(800 + 150 + 60 + 30);
+  });
 });

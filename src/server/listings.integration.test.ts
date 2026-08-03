@@ -127,6 +127,30 @@ describe("V15 listing persistence contract", () => {
     expect(commute?.points).toBe(0);
   });
 
+  it("V16 persists profile estimates separately from listing facts", async () => {
+    const listing = await createListingFromDraft({
+      providerName: "GENERIC_URL",
+      draft: draft("profile-estimates", {
+        heatingCost: unknownFact,
+        hotWaterCost: unknownFact,
+        electricityEstimate: unknownFact,
+        internetEstimate: unknownFact,
+      }),
+    });
+    createdIds.push(listing.id);
+    const row = await db.listing.findUniqueOrThrow({
+      where: { id: listing.id },
+    });
+
+    expect(Number(row.monthlyLikelyTotal)).toBe(900 + 150 + 130 + 30);
+    expect(row.recurringEstimateAssumptions).toEqual({
+      profileEnergyEstimate: 130,
+      internetEstimate: 30,
+    });
+    expect(row.electricityEstimateAmount).toBeNull();
+    expect(row.electricityEstimateConfidence).toBe("UNKNOWN");
+  });
+
   it("deduplicates 20 concurrent digest sends before Telegram", async () => {
     const user = await getOwnerUser();
     const previous = {

@@ -100,8 +100,13 @@ function scoreBudget(
   profile: ScoreProfileInput,
   max: number,
 ): ScoreCategory {
+  const profileEstimateCount = Object.keys(
+    cost.profileEstimateAssumptions,
+  ).length;
   const completeness = percent(
-    cost.recurringFieldCount - cost.unknownRecurringFields.length,
+    cost.recurringFieldCount -
+      cost.unknownRecurringFields.length -
+      profileEstimateCount * 0.5,
     cost.recurringFieldCount,
   );
   if (cost.hasUnknownRecurringCost) {

@@ -178,6 +178,53 @@ export function SearchProfileForm({
           </Field>
         </div>
 
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-sm font-medium">
+            Cost assumptions for missing data
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Used only in the likely all-in total when an advert provides no
+            matching cost. These estimates never replace source facts and get
+            half completeness credit.
+          </p>
+          <div className="mt-3 grid sm:grid-cols-2 gap-3">
+            <Field label="Energy: heating, hot water & electricity (€/month)">
+              <Input
+                type="number"
+                min={0}
+                max={1000}
+                step={5}
+                value={value.energyMonthlyEstimate}
+                onChange={(e) =>
+                  setValue((v) => ({
+                    ...v,
+                    energyMonthlyEstimate: Number(e.target.value),
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Internet (€/month)">
+              <Input
+                type="number"
+                min={0}
+                max={1000}
+                step={5}
+                value={value.internetMonthlyEstimate}
+                onChange={(e) =>
+                  setValue((v) => ({
+                    ...v,
+                    internetMonthlyEstimate: Number(e.target.value),
+                  }))
+                }
+              />
+            </Field>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Defaults: €130 energy (Statistics Austria, housing 2025 median) and
+            €30 internet (rounded entry-level provider pricing).
+          </p>
+        </div>
+
         <div className="flex flex-wrap gap-6">
           <ToggleField
             label="Separate bedroom required"

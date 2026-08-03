@@ -51,6 +51,18 @@ export const searchProfile = z
     targetMonthlyMin: z.number().nonnegative().default(900),
     targetMonthlyMax: z.number().positive().default(1000),
     absoluteMonthlyMax: z.number().positive().default(1100),
+    energyMonthlyEstimate: z
+      .number()
+      .finite()
+      .nonnegative()
+      .max(1000)
+      .default(130),
+    internetMonthlyEstimate: z
+      .number()
+      .finite()
+      .nonnegative()
+      .max(1000)
+      .default(30),
     moveInEarliest: z.coerce.date(),
     moveInLatest: z.coerce.date(),
     needsFittedKitchen: z.boolean().default(true),

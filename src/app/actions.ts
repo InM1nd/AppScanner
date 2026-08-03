@@ -205,6 +205,8 @@ export async function updateSearchProfileAction(data: unknown) {
         targetMonthlyMin: parsed.targetMonthlyMin,
         targetMonthlyMax: parsed.targetMonthlyMax,
         absoluteMonthlyMax: parsed.absoluteMonthlyMax,
+        energyMonthlyEstimate: parsed.energyMonthlyEstimate,
+        internetMonthlyEstimate: parsed.internetMonthlyEstimate,
         moveInEarliest: parsed.moveInEarliest,
         moveInLatest: parsed.moveInLatest,
         needsFittedKitchen: parsed.needsFittedKitchen,
