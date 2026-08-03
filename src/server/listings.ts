@@ -8,7 +8,15 @@ import {
   type DuplicateCandidate,
 } from "@/lib/duplicate";
 import { validateListingDraft } from "@/lib/validation";
-import { factsToColumns, factsToSparseColumns } from "./listing-mapper";
+import {
+  MONEY_FIELDS,
+  factsToColumns,
+  factsToSparseColumns,
+} from "./listing-mapper";
+import {
+  changedSnapshotFields,
+  type SnapshotScalar,
+} from "@/lib/listing-snapshot";
 import { recomputeListing } from "./recompute";
 import { toNum } from "./decimal";
 import { getOwnerUser } from "./current-user";
@@ -32,6 +40,65 @@ async function getOrCreateProvider(name: ProviderName) {
   });
 }
 
+async function recomputeAfterWrite(listingId: string): Promise<boolean> {
+  try {
+    await recomputeListing(listingId);
+    return true;
+  } catch (error) {
+    console.error(`Failed to recompute listing ${listingId}.`, error);
+    if (process.env.NODE_ENV !== "production") throw error;
+    try {
+      await inngest.send({
+        name: "appscanner/recompute-all.requested",
+        data: {},
+      });
+    } catch (enqueueError) {
+      console.error(
+        `Failed to enqueue recompute recovery for listing ${listingId}.`,
+        enqueueError,
+      );
+      // recomputePending is also recovered by the scheduled recovery job.
+    }
+    return false;
+  }
+}
+
+function listingSnapshotValues(
+  listing: Record<string, unknown>,
+): Record<string, SnapshotScalar> {
+  const values: Record<string, SnapshotScalar> = {};
+  for (const field of [
+    "title",
+    "address",
+    "district",
+    "rooms",
+    "squareMeters",
+    "contractType",
+    "furnishedLevel",
+  ]) {
+    const value = listing[field];
+    values[field] =
+      value === null ||
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+        ? value
+        : null;
+  }
+  const availabilityDate = listing.availabilityDate;
+  values.availabilityDate =
+    availabilityDate instanceof Date
+      ? availabilityDate.toISOString()
+      : typeof availabilityDate === "string"
+        ? availabilityDate
+        : null;
+  for (const field of MONEY_FIELDS) {
+    const key = `${field}Amount`;
+    values[key] = toNum(listing[key] as Parameters<typeof toNum>[0]);
+  }
+  return values;
+}
+
 async function findDuplicate(candidate: DuplicateCandidate) {
   const pool = await db.listing.findMany({
     select: {
@@ -44,6 +111,7 @@ async function findDuplicate(candidate: DuplicateCandidate) {
       rooms: true,
       squareMeters: true,
       baseRentAmount: true,
+      advertisedMonthlyTotalAmount: true,
     },
   });
   const existing: DuplicateCandidate[] = pool.map((row) => ({
@@ -56,6 +124,7 @@ async function findDuplicate(candidate: DuplicateCandidate) {
     rooms: row.rooms,
     squareMeters: row.squareMeters,
     baseRentAmount: toNum(row.baseRentAmount),
+    advertisedMonthlyTotalAmount: toNum(row.advertisedMonthlyTotalAmount),
   }));
   return findDuplicateMatch(candidate, existing);
 }
@@ -176,6 +245,7 @@ export async function createListingFromDraft({
     rooms: draft.rooms,
     squareMeters: draft.squareMeters,
     baseRentAmount: draft.baseRent.amount,
+    advertisedMonthlyTotalAmount: draft.advertisedMonthlyTotal.amount,
   });
 
   if (
@@ -270,26 +340,15 @@ export async function createListingFromDraft({
     throw error;
   }
 
-  try {
-    await recomputeListing(listing.id);
-  } catch {
-    if (process.env.NODE_ENV === "production") {
-      try {
-        await inngest.send({
-          name: "appscanner/recompute-all.requested",
-          data: {},
-        });
-      } catch {
-        // recomputePending is recovered by the scheduled recovery job.
-      }
-    }
-  }
+  const recomputed = await recomputeAfterWrite(listing.id);
 
-  try {
-    const user = await getOwnerUser();
-    await notifyNewHighScore(user.id, listing.id);
-  } catch {
-    // Notifications are best-effort — a Telegram/network failure must never block a save.
+  if (recomputed) {
+    try {
+      const user = await getOwnerUser();
+      await notifyNewHighScore(user.id, listing.id);
+    } catch {
+      // Notifications are best-effort — a Telegram/network failure must never block a save.
+    }
   }
 
   return db.listing.findUniqueOrThrow({
@@ -317,59 +376,53 @@ export async function updateListingFromDraft(
       where: { id: listingId },
       data: { ...draftToSparseListingFields(draft), recomputePending: true },
     });
+    const fields = changedSnapshotFields(
+      listingSnapshotValues(before as unknown as Record<string, unknown>),
+      listingSnapshotValues(row as unknown as Record<string, unknown>),
+    );
     await tx.listingSnapshot.create({
       data: {
         listingId,
         changeType: "REFRESHED",
-        fields: {
-          baseRentAmountBefore: toNum(before.baseRentAmount),
-          baseRentAmountAfter: toNum(row.baseRentAmount),
-        },
-        changeSummary: "Refreshed from source.",
+        fields,
+        changeSummary: `Refreshed from source (${Object.keys(fields).length} fields changed).`,
       },
     });
     return row;
   });
 
-  try {
-    await recomputeListing(listingId);
-  } catch (error) {
-    if (process.env.NODE_ENV === "production")
-      await inngest.send({
-        name: "appscanner/recompute-all.requested",
-        data: {},
-      });
-    throw error;
-  }
+  const recomputed = await recomputeAfterWrite(listingId);
 
-  const after = await db.listing.findUniqueOrThrow({
-    where: { id: listingId },
-    include: { scoreBreakdown: true, watchlistItems: true },
-  });
-  try {
-    const user = await getOwnerUser();
-    const watched = after.watchlistItems.some(
-      (item) => item.userId === user.id && item.notifyOnPriceChange,
-    );
-    const oldTotal = toNum(before.monthlyLikelyTotal);
-    const newTotal = toNum(after.monthlyLikelyTotal);
-    if (
-      watched &&
-      !before.hasUnknownMandatoryCost &&
-      !after.hasUnknownMandatoryCost &&
-      oldTotal !== null &&
-      newTotal !== null &&
-      newTotal < oldTotal
-    ) {
-      await notifyPriceDrop(user.id, listingId, oldTotal, newTotal);
+  if (recomputed) {
+    const after = await db.listing.findUniqueOrThrow({
+      where: { id: listingId },
+      include: { scoreBreakdown: true, watchlistItems: true },
+    });
+    try {
+      const user = await getOwnerUser();
+      const watched = after.watchlistItems.some(
+        (item) => item.userId === user.id && item.notifyOnPriceChange,
+      );
+      const oldTotal = toNum(before.monthlyLikelyTotal);
+      const newTotal = toNum(after.monthlyLikelyTotal);
+      if (
+        watched &&
+        !before.hasUnknownMandatoryCost &&
+        !after.hasUnknownMandatoryCost &&
+        oldTotal !== null &&
+        newTotal !== null &&
+        newTotal < oldTotal
+      ) {
+        await notifyPriceDrop(user.id, listingId, oldTotal, newTotal);
+      }
+      const wasStrong =
+        (before.scoreBreakdown?.totalScore ?? 0) >= 70 &&
+        (before.scoreBreakdown?.dataCompleteness ?? 0) >= 70 &&
+        !before.scoreBreakdown?.isZeroed;
+      if (!wasStrong) await notifyNewHighScore(user.id, listingId);
+    } catch {
+      // Notifications are best-effort — a Telegram/network failure must never block a refresh.
     }
-    const wasStrong =
-      (before.scoreBreakdown?.totalScore ?? 0) >= 70 &&
-      (before.scoreBreakdown?.dataCompleteness ?? 0) >= 70 &&
-      !before.scoreBreakdown?.isZeroed;
-    if (!wasStrong) await notifyNewHighScore(user.id, listingId);
-  } catch {
-    // Notifications are best-effort — a Telegram/network failure must never block a refresh.
   }
   return updated;
 }

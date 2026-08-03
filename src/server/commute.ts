@@ -64,8 +64,22 @@ export async function recalculateAllCommutes(userId: string) {
     select: { id: true },
   });
   let calculated = 0;
+  const errors: { listingId: string; message: string }[] = [];
   for (const { id } of listings) {
-    if (await calculateCommuteForListing(id, userId)) calculated++;
+    try {
+      if (await calculateCommuteForListing(id, userId)) calculated++;
+    } catch (error) {
+      errors.push({
+        listingId: id,
+        message:
+          error instanceof Error ? error.message : "Unknown commute error.",
+      });
+    }
   }
-  return { total: listings.length, calculated };
+  return {
+    total: listings.length,
+    calculated,
+    failed: errors.length,
+    errors,
+  };
 }

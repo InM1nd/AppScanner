@@ -12,19 +12,20 @@ import { extractMoneyFieldsWithAI, isAiExtractionEnabled } from "./ai-extract";
 
 const PRICE_PATTERN = /(?:€|EUR)\s?([\d]{2,4}(?:[.,]\d{2})?)/;
 
+function listingUrls(rawEmail: string, listingUrlPattern: RegExp): string[] {
+  const urls = new Set<string>();
+  const globalPattern = new RegExp(listingUrlPattern.source, "gi");
+  for (const match of rawEmail.matchAll(globalPattern)) urls.add(match[0]);
+  return [...urls];
+}
+
 export async function extractListingsFromEmail(
   rawEmail: string,
   listingUrlPattern: RegExp,
   sourceListingIdPattern: RegExp,
 ): Promise<NormalizedListing[]> {
-  const urls = new Set<string>();
-  const globalPattern = new RegExp(listingUrlPattern.source, "gi");
-  for (const match of rawEmail.matchAll(globalPattern)) {
-    urls.add(match[0]);
-  }
-
   const results: NormalizedListing[] = [];
-  for (const url of urls) {
+  for (const url of listingUrls(rawEmail, listingUrlPattern)) {
     const draft = buildUrlOnlyDraft(url, sourceListingIdPattern);
 
     const urlIndex = rawEmail.indexOf(url);
@@ -61,5 +62,28 @@ export async function extractListingsFromEmail(
     });
   }
 
+  return results;
+}
+
+export async function extractFetchedListingsFromEmail(
+  rawEmail: string,
+  listingUrlPattern: RegExp,
+  sourceListingIdPattern: RegExp,
+  fetchListing: (url: string) => Promise<NormalizedListing>,
+): Promise<NormalizedListing[]> {
+  const results: NormalizedListing[] = [];
+  for (const url of listingUrls(rawEmail, listingUrlPattern)) {
+    try {
+      results.push({
+        ...(await fetchListing(url)),
+        importMethod: "EMAIL_ALERT",
+      });
+    } catch {
+      results.push({
+        ...buildUrlOnlyDraft(url, sourceListingIdPattern),
+        importMethod: "EMAIL_ALERT",
+      });
+    }
+  }
   return results;
 }

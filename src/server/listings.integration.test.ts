@@ -6,7 +6,11 @@ import {
   unknownFact,
   type NormalizedListing,
 } from "@/types/listing";
-import { createListingFromDraft, DuplicateListingError } from "./listings";
+import {
+  createListingFromDraft,
+  DuplicateListingError,
+  updateListingFromDraft,
+} from "./listings";
 import { getOwnerUser } from "./current-user";
 import { recomputeListing } from "./recompute";
 import { sendDailyDigest } from "./notifications";
@@ -149,6 +153,30 @@ describe("V15 listing persistence contract", () => {
     });
     expect(row.electricityEstimateAmount).toBeNull();
     expect(row.electricityEstimateConfidence).toBe("UNKNOWN");
+  });
+
+  it("stores the fields changed by a source refresh", async () => {
+    const input = draft("snapshot-refresh");
+    const listing = await createListingFromDraft({
+      providerName: "GENERIC_URL",
+      draft: input,
+    });
+    createdIds.push(listing.id);
+
+    await updateListingFromDraft(listing.id, {
+      ...input,
+      rooms: 3,
+      baseRent: exactFact(950, "updated fixture"),
+    });
+
+    const snapshot = await db.listingSnapshot.findFirstOrThrow({
+      where: { listingId: listing.id, changeType: "REFRESHED" },
+      orderBy: { capturedAt: "desc" },
+    });
+    expect(snapshot.fields).toMatchObject({
+      rooms: { before: 2, after: 3 },
+      baseRentAmount: { before: 900, after: 950 },
+    });
   });
 
   it("deduplicates 20 concurrent digest sends before Telegram", async () => {

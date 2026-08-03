@@ -18,6 +18,7 @@ function makeListing(
     rooms: 2,
     squareMeters: 55,
     baseRentAmount: 850,
+    advertisedMonthlyTotalAmount: null,
     ...overrides,
   };
 }
@@ -124,6 +125,47 @@ describe("findDuplicateMatch", () => {
       canonicalUrl: "https://example.com/cand",
       baseRentAmount: 1400,
     });
+    expect(findDuplicateMatch(candidate, existing)).toBeNull();
+  });
+
+  it("falls back to advertised monthly total when base rent is missing", () => {
+    const existing = [
+      makeListing({
+        id: "existing",
+        canonicalUrl: "https://example.com/existing",
+        baseRentAmount: null,
+        advertisedMonthlyTotalAmount: 1_050,
+      }),
+    ];
+    const candidate = makeListing({
+      canonicalUrl: "https://example.com/candidate",
+      baseRentAmount: null,
+      advertisedMonthlyTotalAmount: 1_075,
+    });
+
+    expect(findDuplicateMatch(candidate, existing)).toMatchObject({
+      reason: "SIMILAR_ADDRESS_AND_PRICE",
+      evidence: expect.arrayContaining(["advertised total within tolerance"]),
+    });
+  });
+
+  it("does not compare base rent with an advertised total", () => {
+    const existing = [
+      makeListing({
+        id: "existing",
+        canonicalUrl: "https://example.com/existing",
+        baseRentAmount: null,
+        advertisedMonthlyTotalAmount: 850,
+        squareMeters: null,
+      }),
+    ];
+    const candidate = makeListing({
+      canonicalUrl: "https://example.com/candidate",
+      baseRentAmount: 850,
+      advertisedMonthlyTotalAmount: null,
+      squareMeters: null,
+    });
+
     expect(findDuplicateMatch(candidate, existing)).toBeNull();
   });
 

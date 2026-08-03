@@ -18,6 +18,14 @@ function extractPostalCode(url: string): string | null {
   return match ? match[1] : null;
 }
 
+export function matchesProviderHost(url: string, domains: readonly string[]) {
+  const host = new URL(url).hostname.toLowerCase();
+  return domains.some((domain) => {
+    const normalized = domain.toLowerCase();
+    return host === normalized || host.endsWith(`.${normalized}`);
+  });
+}
+
 export function districtFromPostalCode(
   postalCode: string | null,
 ): number | null {

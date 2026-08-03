@@ -8,6 +8,8 @@ vi.mock("./ai-extract", () => ({
 }));
 
 import { extractListingsFromEmail } from "./email-alert-parsing";
+import { extractFetchedListingsFromEmail } from "./email-alert-parsing";
+import { blankNormalizedListing } from "@/types/listing";
 
 describe("email alert AI money extraction", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -40,5 +42,35 @@ describe("email alert AI money extraction", () => {
     expect(mocks.extractMoneyFieldsWithAI.mock.calls[0][1]).not.toContain(
       "baseRent",
     );
+  });
+});
+
+it("fetches email listings and falls back to URL metadata per failed URL", async () => {
+  const fetched = "https://example.test/listing/123";
+  const failed = "https://example.test/listing/456";
+  const listings = await extractFetchedListingsFromEmail(
+    `${fetched} ${failed}`,
+    /https:\/\/example\.test\/listing\/\d+/,
+    /\/listing\/(\d+)/,
+    async (url) => {
+      if (url === failed) throw new Error("network failed");
+      return {
+        ...blankNormalizedListing,
+        title: "Fetched listing",
+        canonicalUrl: url,
+        sourceListingId: "123",
+        importMethod: "URL_METADATA",
+      };
+    },
+  );
+
+  expect(listings).toHaveLength(2);
+  expect(listings[0]).toMatchObject({
+    title: "Fetched listing",
+    importMethod: "EMAIL_ALERT",
+  });
+  expect(listings[1]).toMatchObject({
+    sourceListingId: "456",
+    importMethod: "EMAIL_ALERT",
   });
 });

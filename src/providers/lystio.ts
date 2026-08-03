@@ -33,8 +33,9 @@ import { waitForRateLimit } from "./shared/rate-limit";
 import { assertSafePublicUrl } from "./shared/safe-fetch";
 import {
   districtFromPostalCode,
-  buildUrlOnlyDraft,
+  matchesProviderHost,
 } from "./shared/url-only-listing";
+import { extractFetchedListingsFromEmail } from "./shared/email-alert-parsing";
 import {
   stripHtml,
   detectAmenitySignal,
@@ -45,11 +46,6 @@ const DOMAINS = ["lystio.at", "www.lystio.at"];
 const SOURCE_ID_PATTERN = /\/(\d+)(?:[/?#]|$)/;
 const LISTING_URL_PATTERN =
   /https?:\/\/(?:www\.)?lystio\.at\/[a-z]{2}\/rent\/apartment\/[^\s"<>]+/i;
-
-function hostMatches(url: string): boolean {
-  const host = new URL(url).hostname;
-  return DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
-}
 
 // "2,849€" -> 2849 (comma is a thousands separator here, not a decimal mark).
 function parseEnglishEuroAmount(raw: string | undefined): number | null {
@@ -371,7 +367,7 @@ export const lystioProvider: ListingProvider = {
   },
 
   async importFromUrl(url) {
-    if (!hostMatches(url)) {
+    if (!matchesProviderHost(url, DOMAINS)) {
       throw new Error(
         `URL host "${new URL(url).hostname}" is not a Lystio URL.`,
       );
@@ -383,28 +379,15 @@ export const lystioProvider: ListingProvider = {
   discoverListingUrls: discoverLystioListingUrls,
 
   async parseEmailAlert(rawEmail) {
-    const urls = new Set<string>();
-    for (const m of rawEmail.matchAll(
-      new RegExp(LISTING_URL_PATTERN.source, "gi"),
-    ))
-      urls.add(m[0]);
-
-    const results: NormalizedListing[] = [];
-    for (const url of urls) {
-      try {
+    return extractFetchedListingsFromEmail(
+      rawEmail,
+      LISTING_URL_PATTERN,
+      SOURCE_ID_PATTERN,
+      async (url) => {
         const html = await fetchHtml(url, DOMAINS);
-        results.push({
-          ...parseLystioListing(html, url),
-          importMethod: "EMAIL_ALERT",
-        });
-      } catch {
-        results.push({
-          ...buildUrlOnlyDraft(url, SOURCE_ID_PATTERN),
-          importMethod: "EMAIL_ALERT",
-        });
-      }
-    }
-    return results;
+        return parseLystioListing(html, url);
+      },
+    );
   },
 
   getSetupInstructions() {

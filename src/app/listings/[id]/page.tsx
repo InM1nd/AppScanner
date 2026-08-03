@@ -172,7 +172,12 @@ export default async function ListingDetailPage({
             upfrontCostLabel={ld.upfrontCost}
           />
           <NotesSection listingId={listing.id} notes={listing.notes} />
-          <TimelineSection snapshots={listing.snapshots} title={ld.timeline} />
+          <TimelineSection
+            snapshots={listing.snapshots}
+            title={ld.timeline}
+            fieldLabels={ld.timelineFields}
+            unknownLabel={c.unknown}
+          />
         </div>
 
         <div className="space-y-6">

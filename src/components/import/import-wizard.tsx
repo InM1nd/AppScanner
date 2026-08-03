@@ -88,7 +88,7 @@ function UrlImport({ onSaved }: { onSaved: () => void }) {
       } else {
         setJob({
           jobId: result.id,
-          drafts: [result.rawParsed as unknown as NormalizedListing],
+          drafts: result.drafts,
         });
       }
     } catch (cause) {
@@ -177,7 +177,7 @@ function EmailImport({ onSaved }: { onSaved: () => void }) {
       } else {
         setJob({
           jobId: result.id,
-          drafts: result.rawParsed as unknown as NormalizedListing[],
+          drafts: result.drafts,
         });
       }
     } catch (cause) {

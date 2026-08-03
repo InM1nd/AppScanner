@@ -132,7 +132,6 @@ export const recalculateCommutesJob = inngest.createFunction(
     triggers: { event: "appscanner/commute-all.requested" },
   },
   async ({ step }) => {
-    const user = await step.run("load-owner", getOwnerUser);
     const ids = await step.run("load-routable-listings", () =>
       db.listing.findMany({
         where: { latitude: { not: null }, longitude: { not: null } },
@@ -140,18 +139,16 @@ export const recalculateCommutesJob = inngest.createFunction(
         orderBy: { id: "asc" },
       }),
     );
-    let calculated = 0;
     for (let offset = 0; offset < ids.length; offset += 25) {
-      for (const { id } of ids.slice(offset, offset + 25)) {
-        if (
-          await step.run(`commute-${id}`, () =>
-            calculateCommuteForListing(id, user.id),
-          )
-        )
-          calculated++;
-      }
+      await step.sendEvent(
+        `queue-commutes-${offset}`,
+        ids.slice(offset, offset + 25).map(({ id }) => ({
+          name: "appscanner/commute-one.requested",
+          data: { listingId: id },
+        })),
+      );
     }
-    return { total: ids.length, calculated };
+    return { total: ids.length, queued: ids.length };
   },
 );
 

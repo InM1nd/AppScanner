@@ -11,6 +11,7 @@ export interface DuplicateCandidate {
   rooms: number | null;
   squareMeters: number | null;
   baseRentAmount: number | null;
+  advertisedMonthlyTotalAmount: number | null;
 }
 
 export type DuplicateMatchReason =
@@ -75,6 +76,26 @@ function withinTolerance(
 }
 
 const ADDRESS_SIMILARITY_THRESHOLD = 0.6;
+
+function comparablePrice(
+  left: DuplicateCandidate,
+  right: DuplicateCandidate,
+): readonly [string, number, number] | null {
+  if (left.baseRentAmount !== null && right.baseRentAmount !== null) {
+    return ["base rent", left.baseRentAmount, right.baseRentAmount];
+  }
+  if (
+    left.advertisedMonthlyTotalAmount !== null &&
+    right.advertisedMonthlyTotalAmount !== null
+  ) {
+    return [
+      "advertised total",
+      left.advertisedMonthlyTotalAmount,
+      right.advertisedMonthlyTotalAmount,
+    ];
+  }
+  return null;
+}
 
 function betterMatch(
   current: DuplicateMatch | null,
@@ -150,11 +171,17 @@ export function findDuplicateMatch(
     );
     if (addressSimilarity < ADDRESS_SIMILARITY_THRESHOLD) continue;
 
-    const comparable = [
+    const price = comparablePrice(candidate, other);
+    const comparable: (readonly [
+      string,
+      number | null,
+      number | null,
+      number,
+    ])[] = [
       ["rooms", candidate.rooms, other.rooms, 0.15],
-      ["price", candidate.baseRentAmount, other.baseRentAmount, 0.08],
+      ...(price ? [[price[0], price[1], price[2], 0.08] as const] : []),
       ["area", candidate.squareMeters, other.squareMeters, 0.08],
-    ] as const;
+    ];
     const available = comparable.filter(
       ([, left, right]) => left !== null && right !== null,
     );

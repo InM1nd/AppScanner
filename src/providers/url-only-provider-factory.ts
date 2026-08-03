@@ -9,7 +9,10 @@ import type {
   ProviderSetupInstruction,
 } from "@/types/provider";
 import type { SearchProfile } from "@/types/search-profile";
-import { buildUrlOnlyDraft } from "./shared/url-only-listing";
+import {
+  buildUrlOnlyDraft,
+  matchesProviderHost,
+} from "./shared/url-only-listing";
 import { extractListingsFromEmail } from "./shared/email-alert-parsing";
 
 export interface UrlOnlyProviderConfig {
@@ -32,14 +35,9 @@ export function createUrlOnlyProvider(
     },
 
     async importFromUrl(url) {
-      const parsed = new URL(url);
-      const hostMatches = config.domains.some(
-        (domain) =>
-          parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`),
-      );
-      if (!hostMatches) {
+      if (!matchesProviderHost(url, config.domains)) {
         throw new Error(
-          `URL host "${parsed.hostname}" does not match provider "${config.name}" (expected one of: ${config.domains.join(", ")}).`,
+          `URL host "${new URL(url).hostname}" does not match provider "${config.name}" (expected one of: ${config.domains.join(", ")}).`,
         );
       }
       return buildUrlOnlyDraft(url, config.sourceListingIdPattern);

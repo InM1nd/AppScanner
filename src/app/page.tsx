@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { listAllListings } from "@/server/queries";
 import { formatEur, formatRelativeTime, districtLabel } from "@/lib/format";
 import { daysAgo } from "@/lib/time";
+import { getTopMatches } from "@/lib/dashboard";
 import { getDictionary } from "@/i18n/server";
 import { ScoreBadge } from "@/components/shared/score-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -43,21 +44,7 @@ export default async function DashboardPage() {
     )
     .sort((a, b) => b.importedAt.getTime() - a.importedAt.getTime());
 
-  const topMatches = [...listings]
-    .filter(
-      (l) =>
-        l.scoreBreakdown &&
-        l.scoreBreakdown.totalScore >= 70 &&
-        l.scoreBreakdown.dataCompleteness >= 70 &&
-        !l.scoreBreakdown.isZeroed &&
-        !["REJECTED", "ARCHIVED"].includes(l.status),
-    )
-    .sort(
-      (a, b) =>
-        (b.scoreBreakdown?.totalScore ?? 0) -
-        (a.scoreBreakdown?.totalScore ?? 0),
-    )
-    .slice(0, 5);
+  const topMatches = getTopMatches(listings);
 
   const urgent = listings.filter((l) => {
     if (["REJECTED", "ARCHIVED"].includes(l.status)) return false;

@@ -20,8 +20,9 @@ import {
 import { fetchHtml } from "./shared/fetch-html";
 import {
   districtFromPostalCode,
-  buildUrlOnlyDraft,
+  matchesProviderHost,
 } from "./shared/url-only-listing";
+import { extractFetchedListingsFromEmail } from "./shared/email-alert-parsing";
 import {
   parseEuroAmount,
   stripHtml,
@@ -34,11 +35,6 @@ const DOMAINS = ["immobilienscout24.at", "www.immobilienscout24.at"];
 const SOURCE_ID_PATTERN = /expose\/([0-9a-f]{6,})/i;
 const LISTING_URL_PATTERN =
   /https?:\/\/(?:www\.)?immobilienscout24\.at\/expose\/[0-9a-f]+[^\s"<>]*/i;
-
-function hostMatches(url: string): boolean {
-  const host = new URL(url).hostname;
-  return DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
-}
 
 type JsonLdNode = Record<string, unknown>;
 type JsonRecord = Record<string, unknown>;
@@ -439,7 +435,7 @@ export const immoScout24AtProvider: ListingProvider = {
   },
 
   async importFromUrl(url) {
-    if (!hostMatches(url)) {
+    if (!matchesProviderHost(url, DOMAINS)) {
       throw new Error(
         `URL host "${new URL(url).hostname}" is not an ImmoScout24.at URL.`,
       );
@@ -451,28 +447,15 @@ export const immoScout24AtProvider: ListingProvider = {
   discoverListingUrls: discoverIS24ListingUrls,
 
   async parseEmailAlert(rawEmail) {
-    const urls = new Set<string>();
-    for (const m of rawEmail.matchAll(
-      new RegExp(LISTING_URL_PATTERN.source, "gi"),
-    ))
-      urls.add(m[0]);
-
-    const results: NormalizedListing[] = [];
-    for (const url of urls) {
-      try {
+    return extractFetchedListingsFromEmail(
+      rawEmail,
+      LISTING_URL_PATTERN,
+      SOURCE_ID_PATTERN,
+      async (url) => {
         const html = await fetchHtml(url, DOMAINS, true);
-        results.push({
-          ...parseIS24Listing(html, url),
-          importMethod: "EMAIL_ALERT",
-        });
-      } catch {
-        results.push({
-          ...buildUrlOnlyDraft(url, SOURCE_ID_PATTERN),
-          importMethod: "EMAIL_ALERT",
-        });
-      }
-    }
-    return results;
+        return parseIS24Listing(html, url);
+      },
+    );
   },
 
   getSetupInstructions() {

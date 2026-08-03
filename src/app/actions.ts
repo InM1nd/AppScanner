@@ -29,7 +29,19 @@ import { inngest } from "@/inngest/client";
 export async function importFromUrlAction(url: string) {
   const user = await getCurrentUser();
   const job = await startUrlImportJob(user.id, url);
-  return job;
+  const parsed = normalizedListing.safeParse(job.rawParsed);
+  return {
+    id: job.id,
+    status:
+      job.status === "NEEDS_REVIEW" && !parsed.success
+        ? ("FAILED" as const)
+        : job.status,
+    errorMessage:
+      job.status === "NEEDS_REVIEW" && !parsed.success
+        ? "Parsed listing data is invalid."
+        : job.errorMessage,
+    drafts: parsed.success ? [parsed.data] : [],
+  };
 }
 
 export async function importFromEmailAction(
@@ -37,7 +49,20 @@ export async function importFromEmailAction(
   rawEmail: string,
 ) {
   const user = await getCurrentUser();
-  return startEmailImportJob(user.id, providerName, rawEmail);
+  const job = await startEmailImportJob(user.id, providerName, rawEmail);
+  const parsed = normalizedListing.array().safeParse(job.rawParsed);
+  return {
+    id: job.id,
+    status:
+      job.status === "NEEDS_REVIEW" && !parsed.success
+        ? ("FAILED" as const)
+        : job.status,
+    errorMessage:
+      job.status === "NEEDS_REVIEW" && !parsed.success
+        ? "Parsed listing data is invalid."
+        : job.errorMessage,
+    drafts: parsed.success ? parsed.data : [],
+  };
 }
 
 export async function getBlankManualDraftAction() {
@@ -89,7 +114,7 @@ export async function addNoteAction(listingId: string, body: string) {
   const user = await getCurrentUser();
   const note = await addNote(listingId, user.id, body);
   revalidatePath(`/listings/${listingId}`);
-  return note;
+  return { id: note.id };
 }
 
 export async function toggleWatchlistAction(listingId: string) {

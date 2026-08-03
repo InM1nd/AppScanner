@@ -20,8 +20,9 @@ import {
 import { fetchHtml } from "./shared/fetch-html";
 import {
   districtFromPostalCode,
-  buildUrlOnlyDraft,
+  matchesProviderHost,
 } from "./shared/url-only-listing";
+import { extractFetchedListingsFromEmail } from "./shared/email-alert-parsing";
 import {
   parseEuroAmount,
   stripHtml,
@@ -33,11 +34,6 @@ const DOMAINS = ["willhaben.at", "www.willhaben.at"];
 const SOURCE_ID_PATTERN = /-(\d{6,12})(?:[/?#]|$)/;
 const LISTING_URL_PATTERN =
   /https?:\/\/(?:www\.)?willhaben\.at\/iad\/[^\s"<>]+/i;
-
-function hostMatches(url: string): boolean {
-  const host = new URL(url).hostname;
-  return DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
-}
 
 function attributesToMap(
   advertDetails: Record<string, unknown>,
@@ -304,7 +300,7 @@ export const willhabenProvider: ListingProvider = {
   },
 
   async importFromUrl(url) {
-    if (!hostMatches(url)) {
+    if (!matchesProviderHost(url, DOMAINS)) {
       throw new Error(
         `URL host "${new URL(url).hostname}" is not a Willhaben URL.`,
       );
@@ -316,28 +312,15 @@ export const willhabenProvider: ListingProvider = {
   discoverListingUrls: discoverWillhabenListingUrls,
 
   async parseEmailAlert(rawEmail) {
-    const urls = new Set<string>();
-    for (const m of rawEmail.matchAll(
-      new RegExp(LISTING_URL_PATTERN.source, "gi"),
-    ))
-      urls.add(m[0]);
-
-    const results: NormalizedListing[] = [];
-    for (const url of urls) {
-      try {
+    return extractFetchedListingsFromEmail(
+      rawEmail,
+      LISTING_URL_PATTERN,
+      SOURCE_ID_PATTERN,
+      async (url) => {
         const html = await fetchHtml(url, DOMAINS);
-        results.push({
-          ...parseWillhabenListing(html, url),
-          importMethod: "EMAIL_ALERT",
-        });
-      } catch {
-        results.push({
-          ...buildUrlOnlyDraft(url, SOURCE_ID_PATTERN),
-          importMethod: "EMAIL_ALERT",
-        });
-      }
-    }
-    return results;
+        return parseWillhabenListing(html, url);
+      },
+    );
   },
 
   getSetupInstructions() {
