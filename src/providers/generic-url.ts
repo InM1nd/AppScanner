@@ -6,6 +6,12 @@ import type { ListingProvider } from "@/types/provider";
 import { blankNormalizedListing, estimateFact } from "@/types/listing";
 import { fetchHtml } from "./shared/fetch-html";
 import { extractMetadataFromHtml } from "./shared/html-metadata";
+import { MONEY_FIELDS } from "@/server/listing-mapper";
+import {
+  extractMoneyFieldsWithAI,
+  isAiExtractionEnabled,
+} from "./shared/ai-extract";
+import { stripHtml } from "./shared/text-signals";
 
 export const genericUrlProvider: ListingProvider = {
   name: "Generic URL importer",
@@ -17,9 +23,26 @@ export const genericUrlProvider: ListingProvider = {
   async importFromUrl(url) {
     const html = await fetchHtml(url);
     const meta = extractMetadataFromHtml(html);
+    const metadataBaseRent =
+      meta.price !== null
+        ? estimateFact(
+            meta.price,
+            "Extracted from page Open Graph/JSON-LD metadata, unverified.",
+          )
+        : blankNormalizedListing.baseRent;
+    const aiFields = MONEY_FIELDS.filter(
+      (field) =>
+        field !== "baseRent" || metadataBaseRent.confidence === "UNKNOWN",
+    );
+    const visibleText = stripHtml(html);
+    const aiFacts =
+      isAiExtractionEnabled() && visibleText
+        ? await extractMoneyFieldsWithAI(visibleText, aiFields)
+        : {};
 
     return {
       ...blankNormalizedListing,
+      ...aiFacts,
       title: meta.title ?? "Imported listing (needs review)",
       canonicalUrl: url,
       importMethod: "URL_METADATA",
@@ -27,12 +50,9 @@ export const genericUrlProvider: ListingProvider = {
       description: meta.description,
       photos: meta.images,
       baseRent:
-        meta.price !== null
-          ? estimateFact(
-              meta.price,
-              "Extracted from page Open Graph/JSON-LD metadata, unverified.",
-            )
-          : blankNormalizedListing.baseRent,
+        metadataBaseRent.confidence !== "UNKNOWN"
+          ? metadataBaseRent
+          : (aiFacts.baseRent ?? metadataBaseRent),
     };
   },
 

@@ -7,14 +7,16 @@
 import { buildUrlOnlyDraft } from "./url-only-listing";
 import type { NormalizedListing } from "@/types/listing";
 import { estimateFact } from "@/types/listing";
+import { MONEY_FIELDS } from "@/server/listing-mapper";
+import { extractMoneyFieldsWithAI, isAiExtractionEnabled } from "./ai-extract";
 
 const PRICE_PATTERN = /(?:€|EUR)\s?([\d]{2,4}(?:[.,]\d{2})?)/;
 
-export function extractListingsFromEmail(
+export async function extractListingsFromEmail(
   rawEmail: string,
   listingUrlPattern: RegExp,
   sourceListingIdPattern: RegExp,
-): NormalizedListing[] {
+): Promise<NormalizedListing[]> {
   const urls = new Set<string>();
   const globalPattern = new RegExp(listingUrlPattern.source, "gi");
   for (const match of rawEmail.matchAll(globalPattern)) {
@@ -29,16 +31,31 @@ export function extractListingsFromEmail(
     const windowStart = Math.max(0, urlIndex - 300);
     const windowText = rawEmail.slice(windowStart, urlIndex + 100);
     const priceMatch = windowText.match(PRICE_PATTERN);
+    const heuristicBaseRent = priceMatch
+      ? estimateFact(
+          Number(priceMatch[1].replace(",", ".")),
+          "Parsed from alert email text, unverified.",
+        )
+      : draft.baseRent;
+    const aiFields = MONEY_FIELDS.filter(
+      (field) =>
+        field !== "baseRent" || heuristicBaseRent.confidence === "UNKNOWN",
+    );
+    const aiFacts = isAiExtractionEnabled()
+      ? await extractMoneyFieldsWithAI(
+          rawEmail.slice(Math.max(0, urlIndex - 2_000), urlIndex + 1_000),
+          aiFields,
+        )
+      : {};
 
     results.push({
       ...draft,
+      ...aiFacts,
       importMethod: "EMAIL_ALERT",
-      baseRent: priceMatch
-        ? estimateFact(
-            Number(priceMatch[1].replace(",", ".")),
-            "Parsed from alert email text, unverified.",
-          )
-        : draft.baseRent,
+      baseRent:
+        heuristicBaseRent.confidence !== "UNKNOWN"
+          ? heuristicBaseRent
+          : (aiFacts.baseRent ?? heuristicBaseRent),
       description:
         "Parsed from a pasted saved-search alert email. Please open the listing and verify all fields before saving.",
     });

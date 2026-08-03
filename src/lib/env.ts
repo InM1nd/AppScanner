@@ -50,6 +50,8 @@ export const envSchema = z
     SCRAPER_WORKER_URL: optionalUrl,
     SCRAPER_WORKER_SECRET: optionalNonEmpty,
     SCRAPER_WORKER_STEALTH: z.enum(["true", "false"]).default("false"),
+    AI_EXTRACTION_ENABLED: z.enum(["true", "false"]).default("false"),
+    DEEPSEEK_API_KEY: optionalNonEmpty,
     NOTIFY_MIN_SCORE: positiveInteger(70).pipe(z.number().max(100)),
     NOTIFY_DAILY_DIGEST: z.enum(["true", "false"]).default("false"),
     NOTIFY_DIGEST_HOUR: hour,
@@ -121,6 +123,11 @@ export const envSchema = z
       "SCRAPER_WORKER_SECRET",
       env.SCRAPER_WORKER_ENABLED === "true",
       "Scraper worker secret is required when the worker is enabled.",
+    );
+    requireField(
+      "DEEPSEEK_API_KEY",
+      env.AI_EXTRACTION_ENABLED === "true",
+      "DeepSeek API key is required when AI extraction is enabled.",
     );
     if (
       env.SCRAPER_WORKER_ENABLED === "true" &&
