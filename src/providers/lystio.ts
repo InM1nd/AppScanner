@@ -20,7 +20,7 @@
 // shared/text-signals.ts's parseEuroAmount here.
 
 import * as cheerio from "cheerio";
-import type { ListingProvider } from "@/types/provider";
+import { NonListingPageError, type ListingProvider } from "@/types/provider";
 import {
   blankNormalizedListing,
   exactFact,
@@ -113,7 +113,7 @@ export function parseLystioListing(
   const about = listing.about as Record<string, unknown> | undefined;
   const offers = about?.offers as Record<string, unknown> | undefined;
   if (offers?.["@type"] === "AggregateOffer") {
-    throw new Error(
+    throw new NonListingPageError(
       "This URL lists multiple units in one building, not a single listing. Open a specific unit's page and copy its URL instead.",
     );
   }

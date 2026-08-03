@@ -46,6 +46,10 @@ export const envSchema = z
     CRAWLER_GLOBAL_FETCH_CAP: positiveInteger(40),
     CRAWLER_PER_SEARCH_FETCH_CAP: positiveInteger(15),
     CRAWLER_CRON: optionalNonEmpty,
+    SCRAPER_WORKER_ENABLED: z.enum(["true", "false"]).default("false"),
+    SCRAPER_WORKER_URL: optionalUrl,
+    SCRAPER_WORKER_SECRET: optionalNonEmpty,
+    SCRAPER_WORKER_STEALTH: z.enum(["true", "false"]).default("false"),
     NOTIFY_MIN_SCORE: positiveInteger(70).pipe(z.number().max(100)),
     NOTIFY_DAILY_DIGEST: z.enum(["true", "false"]).default("false"),
     NOTIFY_DIGEST_HOUR: hour,
@@ -108,6 +112,39 @@ export const envSchema = z
       env.ROUTING_PROVIDER === "google",
       "Google Maps key is required for Google routing.",
     );
+    requireField(
+      "SCRAPER_WORKER_URL",
+      env.SCRAPER_WORKER_ENABLED === "true",
+      "Scraper worker URL is required when the worker is enabled.",
+    );
+    requireField(
+      "SCRAPER_WORKER_SECRET",
+      env.SCRAPER_WORKER_ENABLED === "true",
+      "Scraper worker secret is required when the worker is enabled.",
+    );
+    if (
+      env.SCRAPER_WORKER_ENABLED === "true" &&
+      env.SCRAPER_WORKER_SECRET &&
+      env.SCRAPER_WORKER_SECRET.length < 32
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["SCRAPER_WORKER_SECRET"],
+        message: "Scraper worker secret must contain at least 32 characters.",
+      });
+    }
+    if (
+      env.NODE_ENV === "production" &&
+      env.SCRAPER_WORKER_ENABLED === "true" &&
+      env.SCRAPER_WORKER_URL &&
+      new URL(env.SCRAPER_WORKER_URL).protocol !== "https:"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["SCRAPER_WORKER_URL"],
+        message: "Scraper worker URL must use HTTPS in production.",
+      });
+    }
   });
 
 export type AppEnv = z.infer<typeof envSchema>;

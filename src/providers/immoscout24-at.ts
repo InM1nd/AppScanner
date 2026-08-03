@@ -10,7 +10,7 @@
 // (e.g. "Costs-label-Dp_"), so selectors match on the stable prefix only.
 
 import * as cheerio from "cheerio";
-import type { ListingProvider } from "@/types/provider";
+import { NonListingPageError, type ListingProvider } from "@/types/provider";
 import {
   blankNormalizedListing,
   exactFact,
@@ -109,7 +109,7 @@ function parseDeposit(
   };
 }
 
-function parseIS24Listing(
+export function parseIS24Listing(
   html: string,
   fallbackUrl: string,
 ): NormalizedListing {
@@ -118,7 +118,7 @@ function parseIS24Listing(
   const listing = graph.find((n) => n["@type"] === "RealEstateListing");
 
   if (!listing) {
-    throw new Error(
+    throw new NonListingPageError(
       "This URL is a multi-unit project page, not a single listing. Open a specific unit's page and copy its URL instead.",
     );
   }
@@ -128,7 +128,8 @@ function parseIS24Listing(
 
   const offers = product?.offers as Record<string, unknown> | undefined;
   const grossPrice = typeof offers?.price === "number" ? offers.price : null;
-  const grossTotal = parseEuroAmount(costs.get("Gesamtmiete")) ?? grossPrice;
+  const grossRaw = costs.get("Gesamtmiete") ?? costs.get("Monatliche Kosten");
+  const grossTotal = parseEuroAmount(grossRaw) ?? grossPrice;
 
   const address = listing.address as Record<string, unknown> | undefined;
   const postalCode =
@@ -179,6 +180,15 @@ function parseIS24Listing(
     district: districtFromPostalCode(postalCode),
     rooms,
     squareMeters,
+    advertisedMonthlyTotal:
+      grossTotal !== null
+        ? exactFact(
+            grossTotal,
+            grossRaw
+              ? `IS24 cost breakdown: advertised total (${grossRaw})`
+              : `IS24 JSON-LD Offer price (${grossPrice})`,
+          )
+        : unknownFact,
     baseRent:
       netRent !== null
         ? exactFact(
@@ -226,7 +236,7 @@ async function* discoverIS24ListingUrls(
 ): AsyncGenerator<string> {
   let pageUrl: string | null = searchUrl;
   for (let page = 0; page < MAX_SEARCH_PAGES && pageUrl; page++) {
-    const html: string = await fetchHtml(pageUrl, DOMAINS);
+    const html: string = await fetchHtml(pageUrl, DOMAINS, true);
     const ids = new Set<string>();
     for (const m of html.matchAll(/href="\/expose\/([0-9a-f]+)"/gi))
       ids.add(m[1]);
@@ -263,7 +273,7 @@ export const immoScout24AtProvider: ListingProvider = {
         `URL host "${new URL(url).hostname}" is not an ImmoScout24.at URL.`,
       );
     }
-    const html = await fetchHtml(url, DOMAINS);
+    const html = await fetchHtml(url, DOMAINS, true);
     return parseIS24Listing(html, url);
   },
 
@@ -279,7 +289,7 @@ export const immoScout24AtProvider: ListingProvider = {
     const results: NormalizedListing[] = [];
     for (const url of urls) {
       try {
-        const html = await fetchHtml(url, DOMAINS);
+        const html = await fetchHtml(url, DOMAINS, true);
         results.push({
           ...parseIS24Listing(html, url),
           importMethod: "EMAIL_ALERT",

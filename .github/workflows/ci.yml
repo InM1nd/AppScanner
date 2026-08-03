@@ -29,12 +29,16 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
       - run: npm ci
       - run: npm audit --omit=dev
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:unit
+      - run: PYTHONPATH=scraper-worker python -m unittest discover -s scraper-worker/tests
       - run: npm run db:validate
       - run: npm run build
 

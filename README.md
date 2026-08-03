@@ -64,6 +64,7 @@ Optional:
 
 - Telegram: `TELEGRAM_ENABLED=true`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 - Real commute: `ROUTING_PROVIDER=google` and `GOOGLE_MAPS_API_KEY`; otherwise the labeled mock provider is used.
+- ImmoScout24 fallback: deploy `scraper-worker/` on Railway, then set `SCRAPER_WORKER_ENABLED=true`, `SCRAPER_WORKER_URL`, and the same 32+ character `SCRAPER_WORKER_SECRET` in Vercel and Railway. Keep `SCRAPER_WORKER_STEALTH=false` unless CloakBrowser is separately installed and licensed.
 
 Production direct job routes return 404. Scheduled and manual production work goes through signed Inngest functions. The digest runs daily at 08:00 `Europe/Vienna`.
 
@@ -94,7 +95,7 @@ Vercel previews are expected for pull requests; only protected `main` deploys pr
 - `src/lib/cost.ts` and `src/lib/score.ts` contain pure domain logic.
 - `src/server/listing-mapper.ts` owns the flat money-field mapping.
 - `src/server/view-models.ts` converts Prisma `Decimal` before client boundaries.
-- `src/providers/shared/safe-fetch.ts` is the only network path for provider adapters.
+- `src/providers/shared/safe-fetch.ts` is the default network path; the provider-scoped IS24 fallback uses the isolated HMAC-authenticated Railway worker.
 - `src/inngest/functions.ts` owns production schedules and durable job entry points.
 - `SPEC.md` records the product invariants and implementation gates.
 

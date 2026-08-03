@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { NonListingPageError } from "@/types/provider";
 import { parseWillhabenListing } from "./willhaben";
 
 const html = readFileSync(
@@ -50,6 +51,13 @@ describe("parseWillhabenListing", () => {
     );
     expect(parseWillhabenListing(sharedRoom, url).listingType).toBe(
       "SHARED_ROOM",
+    );
+  });
+
+  it("classifies an expired result as a non-listing page", () => {
+    const expired = html.replace('"advertDetails": {', '"expiredDetails": {');
+    expect(() => parseWillhabenListing(expired, url)).toThrow(
+      NonListingPageError,
     );
   });
 });

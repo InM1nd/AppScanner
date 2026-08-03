@@ -1,6 +1,13 @@
 import type { NormalizedListing } from "./listing";
 import type { SearchProfile } from "./search-profile";
 
+export class NonListingPageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NonListingPageError";
+  }
+}
+
 export interface ProviderSearchUrl {
   label: string;
   url: string;

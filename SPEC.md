@@ -8,6 +8,8 @@ Private production-ready Vienna rental decision tool: safe ingestion, correct co
 - Next.js 16 App Router, React 19, Prisma 7/PostgreSQL, Base UI, Inngest.
 - No fabricated facts. UNKNOWN stays null/UNKNOWN. importMethod truthful.
 - PostgreSQL + Inngest only; no Redis/custom queue/Sentry.
+- Railway hosts isolated single-concurrency scraper transport; Vercel remains app/job coordinator.
+- No second crawler framework while Inngest, adapters, fixtures, and Playwright already cover orchestration and parsing.
 - WCAG AA. Desktop primary; full mobile.
 
 # §I
@@ -20,11 +22,17 @@ Private production-ready Vienna rental decision tool: safe ingestion, correct co
 - I.refresh: source disappearance changes availability, never deletes listing.
 - I.provider: Willhaben/Lystio extract only structured fields or explicit provider-scoped evidence; provenance remains attached.
 - I.assumptions: Profile energy/internet defaults feed derived likely cost only; applied values remain separate from listing facts and visible in UI.
+- I.fetch: `POST /v1/fetch` Railway → `{html,finalUrl,transport,status}`; timestamped HMAC auth; provider allowlist; response ≤2 MB.
 
 # §R
 
 - R1|energy default|€130/month = Austrian household median energy cost in 2025|https://www.statistik.at/fileadmin/publications/Wohnen_2025_bf.pdf
 - R2|internet default|€30/month matches current entry home-internet tariffs around €28.90–29.90|https://www.a1.net/internet/internet-zuhause;https://www.magenta.at/internet/internet-zuhause-bestellen;https://www.drei.at/up3web/de/tarife/internet/internet
+- R3|HTTP impersonation|curl_cffi supplies browser TLS/JA3 + HTTP/2/3 fingerprints; no DOM/JS execution|https://curl-cffi.readthedocs.io/en/stable/
+- R4|browser routing|Playwright routes miss Service Worker-owned requests; browser context ! `serviceWorkers: "block"`|https://playwright.dev/docs/network
+- R5|Railway worker|isolated monorepo service supports subdirectory root + Dockerfile + `$PORT` healthcheck|https://docs.railway.com/deployments/monorepo;https://docs.railway.com/builds/dockerfiles;https://docs.railway.com/deployments/healthchecks
+- R6|stealth browser|CloakBrowser Node/Python Playwright-compatible; binary ~200 MB; current build key-gated|https://github.com/CloakHQ/CloakBrowser
+- R7|crawler frameworks|Scrapling bundles curl/Playwright/Camoufox and Crawlee supplies sessions/adaptive crawling; both duplicate current transport/orchestration layers|https://scrapling.readthedocs.io/en/latest/fetching/choosing.html;https://crawlee.dev/api/core/class/SessionPool
 
 # §V
 
@@ -45,6 +53,12 @@ Private production-ready Vienna rental decision tool: safe ingestion, correct co
 - V15: The integration-test runner loads the same local env contract as the app before importing auth or database modules.
 - V16: Profile cost defaults apply only when corresponding listing facts are UNKNOWN, remain derived/visible, and never overwrite listing amount/confidence/source provenance.
 - V17: Profile defaults contribute to likely total and budget score as ESTIMATE but receive at most 50% evidence credit in data completeness.
+- V18: Worker request accepted iff HMAC valid + timestamp age ≤60s; target HTTP(S), provider-allowlisted, public DNS; every redirect revalidated.
+- V19: Fetch cascade native → curl_cffi → Playwright → optional Cloak; fallback provider-scoped; parser + provenance contract unchanged; winning transport logged.
+- V20: Browser context blocks Service Workers + private/local request URLs; timeout, content type, response ≤2 MB, concurrency ≤1.
+- V21: Worker outage/invalid response fails provider run as DEGRADED; ⊥ silent fabricated data or unsafe local fallback.
+- V22: Worker security/transport unit tests import and run on Python 3.9+; deployment may use a newer pinned runtime.
+- V23: Provider-discovered expired, aggregate, or project pages are counted as non-listing skips and never degrade provider health.
 
 # §T
 
@@ -60,6 +74,7 @@ T8|x|UX/UI: decision strip + dashboard/list/mobile/detail/import/compare/setting
 T9|>|full verification complete; external production handoff pending credentials|V1,V2,V3,V4,V5,V6,V7,V8,V9,V10,V11
 T10|x|Willhaben/Lystio structured enrichment + offline contract fixtures|V1,V2,V3,V12,V13,I.cost,I.score,I.provider
 T11|x|transparent profile energy/internet assumptions + recompute/UI|V1,V2,V3,V16,V17,I.cost,I.score,I.assumptions
+T12|x|Railway scraper transport + provider fallback + deployment contract|V1,V5,V6,V18,V19,V20,V21,V22,V23,I.fetch,I.provider
 
 # §B
 
@@ -68,3 +83,6 @@ B1|2026-07-31|German amount `2.850` was interpreted as decimal €2.85 because d
 B2|2026-07-31|Integration Vitest config did not load `.env`, leaving owner email and PostgreSQL password undefined|V15
 B3|2026-08-03|Conditional recurring-field array widened string literals and failed the typecheck gate|V16
 B4|2026-08-03|Prisma migrate deploy cannot create the disposable E2E database itself|V10
+B5|2026-08-03|Worker used Python 3.10 union syntax while the local verification runtime is Python 3.9|V22
+B6|2026-08-03|IS24 discovery yielded multi-unit project pages that the crawler treated as provider failures|V23
+B7|2026-08-03|IS24 parser computed the advertised monthly total but never copied it into the normalized listing|V1,V13

@@ -11,6 +11,7 @@
 
 import { db } from "@/lib/db";
 import { getProviderAdapter } from "@/providers";
+import { NonListingPageError } from "@/types/provider";
 import type { ProviderName } from "@/types/enums";
 import { createListingFromDraft, DuplicateListingError } from "./listings";
 
@@ -40,7 +41,7 @@ export interface CrawlSummary {
   found: number;
   saved: number;
   duplicates: number;
-  skippedReserved: number;
+  skippedNonListings: number;
   failed: number;
   errors: string[];
 }
@@ -68,7 +69,7 @@ export async function runSearchCrawler(
     found: 0,
     saved: 0,
     duplicates: 0,
-    skippedReserved: 0,
+    skippedNonListings: 0,
     failed: 0,
     errors: [],
   };
@@ -127,6 +128,9 @@ export async function runSearchCrawler(
               duplicateStreak++;
               if (stopOnStreak && duplicateStreak >= DUPLICATE_STREAK_LIMIT)
                 break;
+            } else if (error instanceof NonListingPageError) {
+              summary.skippedNonListings++;
+              duplicateStreak = 0;
             } else {
               summary.failed++;
               summary.errors.push(

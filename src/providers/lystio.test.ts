@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { NonListingPageError } from "@/types/provider";
 import { parseLystioListing } from "./lystio";
 
 const html = readFileSync(
@@ -39,7 +40,9 @@ describe("parseLystioListing", () => {
       '"@type": "Offer", "price": 950',
       '"@type": "AggregateOffer", "lowPrice": 950',
     );
-    expect(() => parseLystioListing(aggregate, url)).toThrow("multiple units");
+    expect(() => parseLystioListing(aggregate, url)).toThrow(
+      NonListingPageError,
+    );
   });
 
   it("marks an explicit holiday apartment as temporary", () => {

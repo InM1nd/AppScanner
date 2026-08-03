@@ -9,7 +9,7 @@
 // far more reliable than scraping rendered HTML/CSS selectors.
 
 import * as cheerio from "cheerio";
-import type { ListingProvider } from "@/types/provider";
+import { NonListingPageError, type ListingProvider } from "@/types/provider";
 import {
   blankNormalizedListing,
   exactFact,
@@ -107,7 +107,7 @@ export function parseWillhabenListing(
   const nextData = JSON.parse(raw);
   const advertDetails = nextData?.props?.pageProps?.advertDetails;
   if (!advertDetails) {
-    throw new Error(
+    throw new NonListingPageError(
       "This URL is not a Willhaben listing detail page (it may be expired, or a search-results link). Open the listing itself and copy its URL.",
     );
   }
