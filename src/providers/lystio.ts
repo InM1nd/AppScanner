@@ -36,6 +36,7 @@ import {
   matchesProviderHost,
 } from "./shared/url-only-listing";
 import { extractFetchedListingsFromEmail } from "./shared/email-alert-parsing";
+import { fillUnknownMoneyFacts } from "./shared/ai-extract";
 import {
   stripHtml,
   detectAmenitySignal,
@@ -373,7 +374,9 @@ export const lystioProvider: ListingProvider = {
       );
     }
     const html = await fetchHtml(url, DOMAINS);
-    return parseLystioListing(html, url);
+    const parsed = parseLystioListing(html, url);
+    const aiFacts = await fillUnknownMoneyFacts(parsed, parsed.description);
+    return { ...parsed, ...aiFacts };
   },
 
   discoverListingUrls: discoverLystioListingUrls,

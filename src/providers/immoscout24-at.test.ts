@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NonListingPageError } from "@/types/provider";
-import { parseIS24Listing } from "./immoscout24-at";
+
+const mocks = vi.hoisted(() => ({
+  fetchHtml: vi.fn(),
+  fillUnknownMoneyFacts: vi.fn(),
+}));
+
+vi.mock("./shared/fetch-html", () => ({ fetchHtml: mocks.fetchHtml }));
+vi.mock("./shared/ai-extract", () => ({
+  fillUnknownMoneyFacts: mocks.fillUnknownMoneyFacts,
+}));
+
+import { parseIS24Listing, immoScout24AtProvider } from "./immoscout24-at";
 
 describe("parseIS24Listing", () => {
   it("V13 persists the advertised monthly total from current IS24 markup", () => {
@@ -160,5 +171,51 @@ describe("parseIS24Listing", () => {
     expect(() =>
       parseIS24Listing(html, "https://www.immobilienscout24.at/expose/project"),
     ).toThrow(NonListingPageError);
+  });
+});
+
+describe("immoScout24AtProvider.importFromUrl AI fallback", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("fills fields the structured parse left unknown, without touching what it already found", async () => {
+    const html = `
+      <script type="application/ld+json">{
+        "@graph": [
+          {"@type":"Product","offers":{"@type":"Offer","price":1569.22}},
+          {
+            "@type":"RealEstateListing",
+            "name":"Vienna apartment",
+            "url":"https://www.immobilienscout24.at/expose/abc123",
+            "address":{"postalCode":"1190","addressLocality":"Wien"},
+            "numberOfRooms":2,
+            "floorSize":{"value":50.62}
+          }
+        ]
+      }</script>
+      <span class="Costs-label-test">Monatliche Kosten</span><span class="Costs-price-test">1.569,22 €</span>
+      <span class="Costs-label-test">Miete</span><span class="Costs-price-test">1.392,05 €</span>
+      <span class="Costs-label-test">Betriebskosten</span><span class="Costs-price-test">177,17 €</span>
+    `;
+    mocks.fetchHtml.mockResolvedValue(html);
+    mocks.fillUnknownMoneyFacts.mockResolvedValue({
+      deposit: {
+        amount: 2_784,
+        confidence: "ESTIMATE",
+        sourceText: "2 Bruttomonatsmieten Kaution",
+      },
+    });
+
+    const listing = await immoScout24AtProvider.importFromUrl(
+      "https://www.immobilienscout24.at/expose/abc123",
+    );
+
+    expect(listing.deposit).toEqual({
+      amount: 2_784,
+      confidence: "ESTIMATE",
+      sourceText: "2 Bruttomonatsmieten Kaution",
+    });
+    // Structurally-parsed facts still come straight from the page, untouched.
+    expect(listing.baseRent.amount).toBe(1392.05);
+    expect(listing.operatingCosts.amount).toBe(177.17);
   });
 });

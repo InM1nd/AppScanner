@@ -18,7 +18,7 @@ vi.mock("ai", () => ({
   Output: { object: (value: unknown) => value },
 }));
 
-import { extractMoneyFieldsWithAI } from "./ai-extract";
+import { extractMoneyFieldsWithAI, fillUnknownMoneyFacts } from "./ai-extract";
 
 describe("extractMoneyFieldsWithAI", () => {
   beforeEach(() => {
@@ -90,6 +90,90 @@ describe("extractMoneyFieldsWithAI", () => {
     await expect(
       extractMoneyFieldsWithAI("Miete EUR 1.200", ["baseRent"]),
     ).resolves.toEqual({});
+    expect(mocks.generateText).not.toHaveBeenCalled();
+  });
+});
+
+describe("fillUnknownMoneyFacts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.env.AI_EXTRACTION_ENABLED = "true";
+    mocks.env.DEEPSEEK_API_KEY = "test-key";
+  });
+
+  it("only requests fields that are still unknown", async () => {
+    const knownExceptDeposit = Object.fromEntries(
+      [
+        "advertisedMonthlyTotal",
+        "baseRent",
+        "operatingCosts",
+        "heatingCost",
+        "hotWaterCost",
+        "electricityEstimate",
+        "internetEstimate",
+        "parkingMonthlyCost",
+        "commission",
+        "contractFee",
+      ].map((field) => [
+        field,
+        { amount: 1, confidence: "EXACT" as const, sourceText: "x" },
+      ]),
+    );
+    mocks.generateText.mockResolvedValueOnce({
+      output: {
+        deposit: {
+          amount: 2_400,
+          confidence: "ESTIMATE",
+          sourceText: "Kaution 2.400",
+        },
+      },
+    });
+
+    const result = await fillUnknownMoneyFacts(
+      knownExceptDeposit,
+      "Miete 720. Kaution 2.400.",
+    );
+
+    expect(result).toEqual({
+      deposit: {
+        amount: 2_400,
+        confidence: "ESTIMATE",
+        sourceText: "Kaution 2.400",
+      },
+    });
+    const requestedFields = mocks.generateText.mock.calls[0][0].prompt as string;
+    expect(requestedFields).toBe("Requested fields: deposit\n\nInput text:\nMiete 720. Kaution 2.400.");
+  });
+
+  it("skips the SDK call when no field is unknown", async () => {
+    const allKnown = Object.fromEntries(
+      [
+        "advertisedMonthlyTotal",
+        "baseRent",
+        "operatingCosts",
+        "heatingCost",
+        "hotWaterCost",
+        "electricityEstimate",
+        "internetEstimate",
+        "parkingMonthlyCost",
+        "deposit",
+        "commission",
+        "contractFee",
+      ].map((field) => [
+        field,
+        { amount: 1, confidence: "EXACT" as const, sourceText: "x" },
+      ]),
+    );
+
+    await expect(
+      fillUnknownMoneyFacts(allKnown, "irrelevant text"),
+    ).resolves.toEqual({});
+    expect(mocks.generateText).not.toHaveBeenCalled();
+  });
+
+  it("skips the SDK call when there is no text to extract from", async () => {
+    await expect(fillUnknownMoneyFacts({}, null)).resolves.toEqual({});
+    await expect(fillUnknownMoneyFacts({}, "   ")).resolves.toEqual({});
     expect(mocks.generateText).not.toHaveBeenCalled();
   });
 });

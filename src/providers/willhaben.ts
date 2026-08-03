@@ -23,6 +23,7 @@ import {
   matchesProviderHost,
 } from "./shared/url-only-listing";
 import { extractFetchedListingsFromEmail } from "./shared/email-alert-parsing";
+import { fillUnknownMoneyFacts } from "./shared/ai-extract";
 import {
   parseEuroAmount,
   stripHtml,
@@ -306,7 +307,9 @@ export const willhabenProvider: ListingProvider = {
       );
     }
     const html = await fetchHtml(url, DOMAINS);
-    return parseWillhabenListing(html, url);
+    const parsed = parseWillhabenListing(html, url);
+    const aiFacts = await fillUnknownMoneyFacts(parsed, parsed.description);
+    return { ...parsed, ...aiFacts };
   },
 
   discoverListingUrls: discoverWillhabenListingUrls,

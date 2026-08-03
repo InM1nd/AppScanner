@@ -23,6 +23,7 @@ import {
   matchesProviderHost,
 } from "./shared/url-only-listing";
 import { extractFetchedListingsFromEmail } from "./shared/email-alert-parsing";
+import { fillUnknownMoneyFacts } from "./shared/ai-extract";
 import {
   parseEuroAmount,
   stripHtml,
@@ -441,7 +442,9 @@ export const immoScout24AtProvider: ListingProvider = {
       );
     }
     const html = await fetchHtml(url, DOMAINS, true);
-    return parseIS24Listing(html, url);
+    const parsed = parseIS24Listing(html, url);
+    const aiFacts = await fillUnknownMoneyFacts(parsed, parsed.description);
+    return { ...parsed, ...aiFacts };
   },
 
   discoverListingUrls: discoverIS24ListingUrls,

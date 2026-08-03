@@ -2,7 +2,7 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { getEnv } from "@/lib/env";
-import type { MoneyField } from "@/server/listing-mapper";
+import { MONEY_FIELDS, type MoneyField } from "@/server/listing-mapper";
 import type { FinancialFact } from "@/types/listing";
 
 const aiFinancialFact = z.discriminatedUnion("confidence", [
@@ -71,4 +71,21 @@ Do not calculate missing totals or convert one-time amounts into monthly amounts
     );
     return {};
   }
+}
+
+// Shared merge step for adapters that already extracted some money facts
+// heuristically (structured markup, regex, etc.) and want AI to fill in
+// whatever is still unknown. Only requests fields the adapter didn't already
+// resolve, so a confirmed EXACT/ESTIMATE fact is never sent to the model to
+// begin with — it can't be overridden by construction, not just by convention.
+export async function fillUnknownMoneyFacts(
+  facts: Partial<Record<MoneyField, FinancialFact>>,
+  text: string | null,
+): Promise<Partial<Record<MoneyField, FinancialFact>>> {
+  if (!text?.trim() || !isAiExtractionEnabled()) return {};
+  const unknownFields = MONEY_FIELDS.filter(
+    (field) => (facts[field]?.confidence ?? "UNKNOWN") === "UNKNOWN",
+  );
+  if (unknownFields.length === 0) return {};
+  return extractMoneyFieldsWithAI(text, unknownFields);
 }

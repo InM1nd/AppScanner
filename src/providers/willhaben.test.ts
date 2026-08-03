@@ -1,7 +1,18 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NonListingPageError } from "@/types/provider";
-import { parseWillhabenListing } from "./willhaben";
+
+const mocks = vi.hoisted(() => ({
+  fetchHtml: vi.fn(),
+  fillUnknownMoneyFacts: vi.fn(),
+}));
+
+vi.mock("./shared/fetch-html", () => ({ fetchHtml: mocks.fetchHtml }));
+vi.mock("./shared/ai-extract", () => ({
+  fillUnknownMoneyFacts: mocks.fillUnknownMoneyFacts,
+}));
+
+import { parseWillhabenListing, willhabenProvider } from "./willhaben";
 
 const html = readFileSync(
   new URL("../../fixtures/providers/willhaben-detail.html", import.meta.url),
@@ -59,5 +70,35 @@ describe("parseWillhabenListing", () => {
     expect(() => parseWillhabenListing(expired, url)).toThrow(
       NonListingPageError,
     );
+  });
+});
+
+describe("willhabenProvider.importFromUrl AI fallback", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("fills fields the structured parse left unknown, without touching what it already found", async () => {
+    mocks.fetchHtml.mockResolvedValue(html);
+    mocks.fillUnknownMoneyFacts.mockResolvedValue({
+      baseRent: {
+        amount: 863,
+        confidence: "ESTIMATE",
+        sourceText: "Grundmiete laut Beschreibung 863 Euro",
+      },
+    });
+
+    const listing = await willhabenProvider.importFromUrl(url);
+
+    expect(listing.baseRent).toEqual({
+      amount: 863,
+      confidence: "ESTIMATE",
+      sourceText: "Grundmiete laut Beschreibung 863 Euro",
+    });
+    // Structurally-parsed facts still come straight from the page, untouched.
+    expect(listing.operatingCosts.amount).toBe(87);
+    expect(listing.deposit.amount).toBe(2850);
+
+    const [passedFacts, passedText] = mocks.fillUnknownMoneyFacts.mock.calls[0];
+    expect(passedFacts.operatingCosts.amount).toBe(87);
+    expect(passedText).toBe(listing.description);
   });
 });
