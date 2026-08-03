@@ -3,11 +3,9 @@
 // so real fetching here is on firmer ground than Willhaben's, though both
 // were authorized together (see AGENTS.md).
 //
-// Detail pages carry a schema.org JSON-LD block (`@graph`: WebPage, Product,
-// RealEstateListing) with rooms/area/address/images, but rent is split across
-// a rendered cost-breakdown table (Miete/Betriebskosten/Heizkosten/Kaution)
-// that isn't in the JSON-LD. Their CSS classnames are build-hashed
-// (e.g. "Costs-label-Dp_"), so selectors match on the stable prefix only.
+// Detail pages carry basic schema.org JSON-LD plus a richer Apollo state with
+// the full description, costs, availability and structured property facts.
+// The rendered label/value pairs remain as a fallback for older pages.
 
 import * as cheerio from "cheerio";
 import { NonListingPageError, type ListingProvider } from "@/types/provider";
@@ -43,6 +41,83 @@ function hostMatches(url: string): boolean {
 }
 
 type JsonLdNode = Record<string, unknown>;
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as JsonRecord)
+    : null;
+}
+
+function extractApolloExpose(html: string): JsonRecord | null {
+  const marker = "window.__APOLLO_STATE__=";
+  const $ = cheerio.load(html);
+  for (const script of $("script").toArray()) {
+    const raw = $(script).contents().text();
+    const start = raw.indexOf(marker);
+    if (start === -1) continue;
+    const serialized = raw
+      .slice(start + marker.length)
+      .split(/\r?\n/, 1)[0]
+      .replace(/;$/, "");
+    try {
+      const state = asRecord(JSON.parse(serialized));
+      if (!state) return null;
+      return (
+        Object.values(state)
+          .map(asRecord)
+          .find((value) => value?.__typename === "Expose") ?? null
+      );
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function textValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function numberValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function apolloCostMap(expose: JsonRecord | null): Map<string, string> {
+  const map = new Map<string, string>();
+  const costs = asRecord(expose?.costs);
+  for (const group of [costs?.running, costs?.oneTime]) {
+    if (!Array.isArray(group)) continue;
+    for (const raw of group) {
+      const row = asRecord(raw);
+      const label = textValue(row?.label);
+      const price = textValue(row?.price);
+      if (label && price && !map.has(label)) map.set(label, price);
+    }
+  }
+  return map;
+}
+
+function parseGermanDate(value: unknown): Date | null {
+  const match = textValue(value)?.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+  if (!match) return null;
+  const date = new Date(
+    Number(match[3]),
+    Number(match[2]) - 1,
+    Number(match[1]),
+  );
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseContractFee(description: string | null): FinancialFact {
+  const raw = description?.match(
+    /(?:abwicklungshonorar|vertragserrichtungsgeb(?:ü|ue)hr)[\s\S]{0,60}?(?:EUR|€)\s*([\d.]+(?:,\d{1,2})?)/i,
+  )?.[1];
+  const amount = parseEuroAmount(raw);
+  return amount === null
+    ? unknownFact
+    : exactFact(amount, `IS24 description: contract fee (${raw})`);
+}
 
 function extractJsonLdGraph(html: string): JsonLdNode[] {
   const $ = cheerio.load(html);
@@ -116,6 +191,7 @@ export function parseIS24Listing(
   const graph = extractJsonLdGraph(html);
   const product = graph.find((n) => n["@type"] === "Product");
   const listing = graph.find((n) => n["@type"] === "RealEstateListing");
+  const expose = extractApolloExpose(html);
 
   if (!listing) {
     throw new NonListingPageError(
@@ -123,13 +199,19 @@ export function parseIS24Listing(
     );
   }
 
-  const costs = extractLabelValuePairs(html, "Costs-label-", "Costs-price-");
+  const apolloCosts = apolloCostMap(expose);
+  const costs =
+    apolloCosts.size > 0
+      ? apolloCosts
+      : extractLabelValuePairs(html, "Costs-label-", "Costs-price-");
   const keyfacts = extractLabelValuePairs(html, "Label-label-", "Label-value-");
 
   const offers = product?.offers as Record<string, unknown> | undefined;
-  const grossPrice = typeof offers?.price === "number" ? offers.price : null;
+  const priceInformation = asRecord(expose?.priceInformation);
+  const grossPrice =
+    numberValue(priceInformation?.primaryPrice) ?? numberValue(offers?.price);
   const grossRaw = costs.get("Gesamtmiete") ?? costs.get("Monatliche Kosten");
-  const grossTotal = parseEuroAmount(grossRaw) ?? grossPrice;
+  const grossTotal = grossPrice ?? parseEuroAmount(grossRaw);
 
   const address = listing.address as Record<string, unknown> | undefined;
   const postalCode =
@@ -148,8 +230,10 @@ export function parseIS24Listing(
       : [];
 
   const description =
-    typeof product?.description === "string" ? product.description : null;
+    textValue(asRecord(expose?.description)?.descriptionNote) ??
+    textValue(product?.description);
   const combinedText = `${description ?? ""} ${listing.name ?? ""}`;
+  const evidence = combinedText.toLowerCase();
 
   const idMatch = (
     typeof listing.url === "string" ? listing.url : fallbackUrl
@@ -164,6 +248,33 @@ export function parseIS24Listing(
   const netRent = parseEuroAmount(costs.get("Miete"));
   const operating = parseEuroAmount(costs.get("Betriebskosten"));
   const heating = parseEuroAmount(costs.get("Heizkosten Netto"));
+  const object = asRecord(expose?.object);
+  const area = asRecord(expose?.area);
+  const fitting = asRecord(expose?.fitting);
+  const condition = asRecord(expose?.condition);
+  const firingTypes = Array.isArray(condition?.firingTypes)
+    ? condition.firingTypes
+        .map(asRecord)
+        .flatMap((item) => [textValue(item?.label), textValue(item?.value)])
+        .filter((value): value is string => value !== null)
+        .join(" ")
+    : "";
+  const energyRating = textValue(
+    asRecord(asRecord(condition?.energyCertification)?.heatingDemandClass)
+      ?.label,
+  );
+  const availabilityDate = parseGermanDate(object?.availableFrom);
+  const hasFixedRentalPeriod =
+    textValue(object?.rentalPeriod) !== null &&
+    textValue(object?.rentalPeriodType) !== null;
+  const bedroomCount = numberValue(area?.numberOfBedrooms);
+  const balconyCount = numberValue(area?.numberOfBalconies);
+  const cellarArea = numberValue(area?.cellarArea);
+  const lift = Array.isArray(fitting?.lift) ? fitting.lift : [];
+  const commission =
+    priceInformation?.hasCommission === false
+      ? exactFact(0, "IS24 price information: free of commission")
+      : unknownFact;
 
   return {
     ...blankNormalizedListing,
@@ -210,12 +321,72 @@ export function parseIS24Listing(
             `IS24 cost breakdown: Heizkosten Netto (${costs.get("Heizkosten Netto")})`,
           )
         : unknownFact,
-    deposit: parseDeposit(keyfacts.get("Kaution"), grossTotal),
-    contractType: detectContractType(keyfacts.get("Befristung")),
-    heatingType: detectHeatingType(combinedText),
-    elevator: detectAmenitySignal(combinedText, ["lift", "aufzug"]),
-    storage: detectAmenitySignal(combinedText, ["keller", "abstellraum"]),
-    balcony: detectAmenitySignal(combinedText, ["balkon", "terrasse"]),
+    deposit: parseDeposit(
+      costs.get("Kaution") ?? keyfacts.get("Kaution"),
+      grossTotal,
+    ),
+    commission,
+    contractFee: parseContractFee(description),
+    availabilityDate,
+    contractType: hasFixedRentalPeriod
+      ? "FIXED_TERM"
+      : detectContractType(keyfacts.get("Befristung")),
+    hasSeparateBedroom:
+      bedroomCount !== null && bedroomCount > 0
+        ? "YES"
+        : /kein(?:e|en)? (?:separates? )?schlafzimmer/.test(evidence)
+          ? "NO"
+          : /\bschlafzimmer\b/.test(evidence)
+            ? "YES"
+            : "UNKNOWN",
+    kitchen: /keine k(?:ü|ue)che/.test(evidence)
+      ? "NONE"
+      : /einbauk(?:ü|ue)che/.test(evidence)
+        ? "FITTED"
+        : /\bk(?:ü|ue)che\b|k(?:ü|ue)chenzeile|markenk(?:ü|ue)che/.test(
+              evidence,
+            )
+          ? "BASIC"
+          : "UNKNOWN",
+    washingMachine: /waschmaschinenanschluss/.test(evidence)
+      ? "CONNECTION_ONLY"
+      : /keine waschmaschine/.test(evidence)
+        ? "NONE"
+        : /\bwaschmaschine\b/.test(evidence)
+          ? "MACHINE_INCLUDED"
+          : "UNKNOWN",
+    parkingAvailability:
+      /(?:garage|garagenplatz|stellplatz)[\s\S]{0,40}(?:aufpreis|monatlich|extra)/.test(
+        evidence,
+      )
+        ? "AVAILABLE_EXTRA_COST"
+        : "UNKNOWN",
+    heatingType: /\bgas\b/i.test(firingTypes)
+      ? "GAS"
+      : detectHeatingType(`${combinedText} ${firingTypes}`),
+    energyRating,
+    elevator:
+      lift.length > 0
+        ? "YES"
+        : detectAmenitySignal(combinedText, ["lift", "aufzug"]),
+    storage:
+      cellarArea !== null && cellarArea > 0
+        ? "YES"
+        : detectAmenitySignal(combinedText, ["keller", "abstellraum"]),
+    balcony:
+      balconyCount !== null && balconyCount > 0
+        ? "YES"
+        : detectAmenitySignal(combinedText, ["balkon", "terrasse"]),
+    airConditioning: detectAmenitySignal(combinedText, ["klimaanlage"]),
+    quietCourtyardSignal:
+      /ruhig/.test(evidence) && /innenhof|hofseitig|hofseite/.test(evidence)
+        ? "YES"
+        : "UNKNOWN",
+    newerOrRenovatedSignal: /erstbezug|neubau|frisch renoviert|saniert/.test(
+      evidence,
+    )
+      ? "YES"
+      : "UNKNOWN",
     description: stripHtml(description),
     photos: images,
   };
