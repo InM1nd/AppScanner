@@ -20,8 +20,9 @@ export async function fetchHtml(
   useWorkerFallback = false,
 ): Promise<string> {
   const host = new URL(url).hostname;
+  const fallback = useWorkerFallback ? getScraperWorkerFallback() : null;
 
-  const allowed = await isFetchAllowedByRobots(url, BROWSER_USER_AGENT);
+  const allowed = await isFetchAllowedByRobots(url, BROWSER_USER_AGENT, fallback);
   if (!allowed) {
     throw new Error(
       `robots.txt for ${host} disallows fetching this path. Use manual entry instead.`,
@@ -50,7 +51,6 @@ export async function fetchHtml(
       }
     }
 
-    const fallback = useWorkerFallback ? getScraperWorkerFallback() : null;
     const eligible =
       nativeError instanceof SafeFetchError &&
       (nativeError.retryable ||

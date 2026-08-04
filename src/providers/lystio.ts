@@ -292,6 +292,28 @@ export function parseLystioListing(
 // dismissed again, so dismissOverlay() runs before each click, not just once.
 const MAX_SEARCH_PAGES = 15;
 
+// Vercel's serverless functions have no local Chromium install, and the
+// full `playwright` package's browser binaries aren't traced into the
+// deployed bundle — @sparticuz/chromium ships a Linux-only, Lambda-sized
+// Chromium build instead. Local dev keeps using the real `playwright`
+// package (installed via `npx playwright install`), since @sparticuz's
+// binary doesn't run on macOS/Windows.
+async function launchChromium() {
+  if (process.env.VERCEL) {
+    const [{ chromium }, { default: sparticuzChromium }] = await Promise.all([
+      import("playwright-core"),
+      import("@sparticuz/chromium"),
+    ]);
+    return chromium.launch({
+      args: sparticuzChromium.args,
+      executablePath: await sparticuzChromium.executablePath(),
+      headless: true,
+    });
+  }
+  const { chromium } = await import("playwright");
+  return chromium.launch();
+}
+
 async function* discoverLystioListingUrls(
   searchUrl: string,
 ): AsyncGenerator<string> {
@@ -301,8 +323,7 @@ async function* discoverLystioListingUrls(
     throw new Error(`robots.txt for lystio.at disallows fetching this path.`);
   await waitForRateLimit("lystio.at", 4000);
 
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage({
       userAgent: BROWSER_USER_AGENT,

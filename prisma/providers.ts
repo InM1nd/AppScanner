@@ -7,6 +7,7 @@ const providers: { name: ProviderName; displayName: string }[] = [
   { name: "IMMOWELT_AT", displayName: "ImmoWelt Austria" },
   { name: "DER_STANDARD", displayName: "Der Standard Immobilien" },
   { name: "FINDMYHOME", displayName: "FindMyHome" },
+  { name: "LYSTIO", displayName: "Lystio" },
   { name: "GENERIC_URL", displayName: "Generic URL importer" },
   { name: "MANUAL", displayName: "Manual entry" },
 ];
