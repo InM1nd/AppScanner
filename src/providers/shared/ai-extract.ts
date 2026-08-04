@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getEnv } from "@/lib/env";
 import { MONEY_FIELDS, type MoneyField } from "@/server/listing-mapper";
 import type { FinancialFact } from "@/types/listing";
+import { parseEuroAmount } from "./text-signals";
 
 const aiFinancialFact = z.discriminatedUnion("confidence", [
   z.object({
@@ -18,13 +19,46 @@ const aiFinancialFact = z.discriminatedUnion("confidence", [
   }),
 ]);
 
+function normalizeEvidence(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function evidenceAmounts(value: string): number[] {
+  return [...value.matchAll(/\d+(?:[.,\s]\d{3})*(?:[.,]\d{1,2})?/g)]
+    .map(([raw]) => {
+      const compact = raw.replace(/\s/g, "");
+      if (/^\d+[.,]\d{3}$/.test(compact))
+        return Number(compact.replace(/[.,]/g, ""));
+      return parseEuroAmount(compact);
+    })
+    .filter((amount): amount is number => amount !== null);
+}
+
+function hasDirectEvidence(
+  input: string,
+  fact: { amount: number; confidence: "ESTIMATE"; sourceText: string },
+): boolean {
+  const inputText = normalizeEvidence(input);
+  const sourceText = normalizeEvidence(fact.sourceText);
+  return (
+    inputText.includes(sourceText) &&
+    evidenceAmounts(fact.sourceText).some(
+      (amount) => Math.abs(amount - fact.amount) <= 0.01,
+    )
+  );
+}
+
 export function isAiExtractionEnabled(): boolean {
   try {
     const env = getEnv();
     return (
       env.AI_EXTRACTION_ENABLED === "true" && Boolean(env.DEEPSEEK_API_KEY)
     );
-  } catch {
+  } catch (error) {
+    console.error(
+      "AI extraction disabled because environment validation failed.",
+      error,
+    );
     return false;
   }
 }
@@ -57,13 +91,21 @@ export async function extractMoneyFieldsWithAI(
       system: `Extract the requested rental money fields from the input and return JSON only.
 Each field must contain amount, confidence, and sourceText. Confidence may only be ESTIMATE or UNKNOWN, never EXACT.
 Never fabricate a value. If the text does not clearly state a field, return {"amount":null,"confidence":"UNKNOWN","sourceText":null}.
-For ESTIMATE, amount must be the stated EUR amount and sourceText must be a short direct quote or close paraphrase from the input that justifies it.
+For ESTIMATE, amount must be the stated EUR amount and sourceText must be a short exact quote from the input that contains that amount.
 Do not calculate missing totals or convert one-time amounts into monthly amounts.`,
       prompt: `Requested fields: ${fields.join(", ")}\n\nInput text:\n${text.slice(0, 50_000)}`,
       timeout: { totalMs: 15_000 },
+      maxRetries: 2,
     });
 
-    return schema.parse(output) as Partial<Record<MoneyField, FinancialFact>>;
+    const parsed = schema.parse(output);
+    const validated: Partial<Record<MoneyField, FinancialFact>> = {};
+    for (const field of fields) {
+      const fact = parsed[field];
+      if (fact.confidence === "UNKNOWN" || hasDirectEvidence(text, fact))
+        validated[field] = fact;
+    }
+    return validated;
   } catch (error) {
     console.error(
       "AI money extraction failed; using existing heuristics.",

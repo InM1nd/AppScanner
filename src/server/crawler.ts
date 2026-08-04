@@ -10,6 +10,7 @@
 // here is read-then-write with no DB unique constraint to catch a race.
 
 import { db } from "@/lib/db";
+import { normalizeCanonicalUrl } from "@/lib/duplicate";
 import { getProviderAdapter } from "@/providers";
 import { NonListingPageError } from "@/types/provider";
 import type { ProviderName } from "@/types/enums";
@@ -51,11 +52,16 @@ let isRunning = false;
 export async function listCrawlerSavedSearchIds(): Promise<string[]> {
   const rows = await db.savedSearch.findMany({
     where: { provider: { isEnabled: true } },
-    select: { id: true },
+    select: { id: true, providerId: true, searchUrl: true },
     orderBy: { id: "asc" },
-    take: Math.max(1, Math.ceil(GLOBAL_FETCH_CAP / PER_SEARCH_FETCH_CAP)),
   });
-  return rows.map(({ id }) => id);
+  const seen = new Set<string>();
+  return rows.flatMap(({ id, providerId, searchUrl }) => {
+    const key = `${providerId}:${normalizeCanonicalUrl(searchUrl)}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [id];
+  });
 }
 
 export async function runSearchCrawler(
@@ -96,9 +102,18 @@ export async function runSearchCrawler(
       let searchFetches = 0;
       let duplicateStreak = 0;
       const errorsBefore = summary.errors.length;
+      const skippedBefore = summary.skippedNonListings;
       const stopOnStreak = assumesNewestFirst(
         providerName,
         savedSearch.searchUrl,
+      );
+      const knownUrls = new Set(
+        (
+          await db.listing.findMany({
+            where: { providerId: savedSearch.providerId },
+            select: { normalizedCanonicalUrl: true },
+          })
+        ).map(({ normalizedCanonicalUrl }) => normalizedCanonicalUrl),
       );
 
       // A page-level failure (bad saved-search URL, site hiccup, a stray
@@ -108,11 +123,16 @@ export async function runSearchCrawler(
         for await (const url of adapter.discoverListingUrls(
           savedSearch.searchUrl,
         )) {
-          if (
-            searchFetches >= PER_SEARCH_FETCH_CAP ||
-            globalFetches >= GLOBAL_FETCH_CAP
-          )
-            break;
+          if (globalFetches >= GLOBAL_FETCH_CAP) break;
+          const normalizedUrl = normalizeCanonicalUrl(url);
+          if (normalizedUrl && knownUrls.has(normalizedUrl)) {
+            summary.duplicates++;
+            duplicateStreak++;
+            if (stopOnStreak && duplicateStreak >= DUPLICATE_STREAK_LIMIT)
+              break;
+            continue;
+          }
+          if (searchFetches >= PER_SEARCH_FETCH_CAP) break;
           searchFetches++;
           globalFetches++;
           summary.found++;
@@ -122,6 +142,8 @@ export async function runSearchCrawler(
             duplicateStreak = 0;
             await createListingFromDraft({ providerName, draft });
             summary.saved++;
+            const savedUrl = normalizeCanonicalUrl(draft.canonicalUrl);
+            if (savedUrl) knownUrls.add(savedUrl);
           } catch (error) {
             if (error instanceof DuplicateListingError) {
               summary.duplicates++;
@@ -141,15 +163,21 @@ export async function runSearchCrawler(
           }
         }
         const runErrors = summary.errors.slice(errorsBefore);
+        const runSkipped = summary.skippedNonListings - skippedBefore;
+        const allFetchedWereNonListings =
+          searchFetches > 0 && runSkipped === searchFetches;
+        const healthError = allFetchedWereNonListings
+          ? `All ${runSkipped} fetched URLs were classified as non-listings.`
+          : runErrors.join("\n").slice(0, 1000);
         await db.provider.update({
           where: { id: savedSearch.providerId },
           data: {
-            healthStatus: runErrors.length === 0 ? "OK" : "DEGRADED",
+            healthStatus:
+              runErrors.length === 0 && !allFetchedWereNonListings
+                ? "OK"
+                : "DEGRADED",
             lastHealthCheckAt: new Date(),
-            lastError:
-              runErrors.length === 0
-                ? null
-                : runErrors.join("\n").slice(0, 1000),
+            lastError: healthError || null,
           },
         });
       } catch (error) {

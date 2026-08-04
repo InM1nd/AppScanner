@@ -19,6 +19,7 @@
     "test:migration:upgrade": "tsx scripts/test-upgrade-migration.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "ai:check": "env -u DEEPSEEK_API_KEY -u AI_EXTRACTION_ENABLED tsx --env-file=.env scripts/check-deepseek.ts",
     "test:e2e:guard": "tsx scripts/check-e2e-database.ts",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",

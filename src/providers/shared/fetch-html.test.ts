@@ -55,4 +55,25 @@ describe("fetchHtml worker fallback", () => {
     ).rejects.toBe(error);
     expect(mocks.fetchViaWorker).not.toHaveBeenCalled();
   });
+
+  it("uses the worker when native HTML is an IS24 robot challenge", async () => {
+    mocks.safeFetchText.mockResolvedValue(
+      "<html><title>Ich bin kein Roboter</title></html>",
+    );
+    mocks.fetchViaWorker.mockResolvedValue({
+      html: "<html>listing</html>",
+      finalUrl: "https://www.immobilienscout24.at/expose/1",
+      transport: "browser",
+      status: 200,
+    });
+
+    await expect(
+      fetchHtml(
+        "https://www.immobilienscout24.at/expose/1",
+        ["immobilienscout24.at"],
+        true,
+      ),
+    ).resolves.toBe("<html>listing</html>");
+    expect(mocks.fetchViaWorker).toHaveBeenCalledOnce();
+  });
 });

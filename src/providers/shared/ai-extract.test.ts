@@ -75,6 +75,56 @@ describe("extractMoneyFieldsWithAI", () => {
     ).resolves.toEqual({});
   });
 
+  it("rejects an estimate whose quote or amount is not in the input", async () => {
+    mocks.generateText.mockResolvedValueOnce({
+      output: {
+        baseRent: {
+          amount: 1_300,
+          confidence: "ESTIMATE",
+          sourceText: "Miete EUR 1.200",
+        },
+      },
+    });
+
+    await expect(
+      extractMoneyFieldsWithAI("Miete EUR 1.200", ["baseRent"]),
+    ).resolves.toEqual({});
+
+    mocks.generateText.mockResolvedValueOnce({
+      output: {
+        baseRent: {
+          amount: 1_200,
+          confidence: "ESTIMATE",
+          sourceText: "Monthly rent EUR 1.200",
+        },
+      },
+    });
+
+    await expect(
+      extractMoneyFieldsWithAI("Miete EUR 1.200", ["baseRent"]),
+    ).resolves.toEqual({});
+  });
+
+  it("accepts English thousands separators in direct evidence", async () => {
+    mocks.generateText.mockResolvedValueOnce({
+      output: {
+        advertisedMonthlyTotal: {
+          amount: 1_190,
+          confidence: "ESTIMATE",
+          sourceText: "Total rent EUR 1,190",
+        },
+      },
+    });
+
+    await expect(
+      extractMoneyFieldsWithAI("Total rent EUR 1,190", [
+        "advertisedMonthlyTotal",
+      ]),
+    ).resolves.toMatchObject({
+      advertisedMonthlyTotal: { amount: 1_190, confidence: "ESTIMATE" },
+    });
+  });
+
   it("does not call the SDK when extraction is disabled", async () => {
     mocks.env.AI_EXTRACTION_ENABLED = "false";
 
@@ -141,8 +191,11 @@ describe("fillUnknownMoneyFacts", () => {
         sourceText: "Kaution 2.400",
       },
     });
-    const requestedFields = mocks.generateText.mock.calls[0][0].prompt as string;
-    expect(requestedFields).toBe("Requested fields: deposit\n\nInput text:\nMiete 720. Kaution 2.400.");
+    const requestedFields = mocks.generateText.mock.calls[0][0]
+      .prompt as string;
+    expect(requestedFields).toBe(
+      "Requested fields: deposit\n\nInput text:\nMiete 720. Kaution 2.400.",
+    );
   });
 
   it("skips the SDK call when no field is unknown", async () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   detectAmenitySignal,
   detectSourceUnavailableSignal,
+  detectSourceUnavailableSignalFromHtml,
   parseEuroAmount,
 } from "./text-signals";
 
@@ -31,7 +32,9 @@ describe("detectSourceUnavailableSignal", () => {
       ),
     ).toBe("GONE");
     expect(
-      detectSourceUnavailableSignal("Sorry, this listing is no longer available."),
+      detectSourceUnavailableSignal(
+        "Sorry, this listing is no longer available.",
+      ),
     ).toBe("GONE");
   });
 
@@ -55,5 +58,23 @@ describe("detectSourceUnavailableSignal", () => {
     expect(
       detectSourceUnavailableSignal("Ein Autoabstellplatz ist reserviert."),
     ).toBeNull();
+  });
+});
+
+describe("detectSourceUnavailableSignalFromHtml", () => {
+  it("ignores unavailable copy embedded in framework scripts", () => {
+    expect(
+      detectSourceUnavailableSignalFromHtml(
+        '<main>Live apartment</main><script>"This listing is no longer available."</script>',
+      ),
+    ).toBeNull();
+  });
+
+  it("keeps visible unavailable notices", () => {
+    expect(
+      detectSourceUnavailableSignalFromHtml(
+        "<main>This listing is no longer available.</main>",
+      ),
+    ).toBe("GONE");
   });
 });

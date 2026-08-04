@@ -101,12 +101,24 @@ export async function isFetchAllowedByRobots(
     });
   } catch {
     if (!workerFallback) return true;
-    return fetchRobotsViaWorker(robotsUrl, userAgent, path, workerFallback, true);
+    return fetchRobotsViaWorker(
+      robotsUrl,
+      userAgent,
+      path,
+      workerFallback,
+      true,
+    );
   }
 
   if (isAllowedByRuleSet(parseRobotsTxt(text, userAgent), path)) return true;
   if (!workerFallback) return false;
-  return fetchRobotsViaWorker(robotsUrl, userAgent, path, workerFallback, false);
+  return fetchRobotsViaWorker(
+    robotsUrl,
+    userAgent,
+    path,
+    workerFallback,
+    false,
+  );
 }
 
 async function fetchRobotsViaWorker(

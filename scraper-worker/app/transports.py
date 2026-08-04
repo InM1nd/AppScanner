@@ -40,6 +40,8 @@ def _validate_result(result: FetchResult) -> None:
             "just a moment...</title>",
             "enable javascript and cookies to continue",
             "captcha-delivery.com",
+            "ich bin kein roboter",
+            "fälschlicherweise als roboter identifiziert",
         )
     ):
         raise FetchError("Transport returned an anti-bot challenge page.")

@@ -100,3 +100,12 @@ export function detectSourceUnavailableSignal(
   if (RESERVED_SIGNAL_PATTERN.test(text)) return "RESERVED";
   return null;
 }
+
+export function detectSourceUnavailableSignalFromHtml(
+  html: string | null | undefined,
+): "GONE" | "RESERVED" | null {
+  if (!html) return null;
+  const $ = cheerio.load(html);
+  $("script, style, noscript, template").remove();
+  return detectSourceUnavailableSignal($.root().text());
+}

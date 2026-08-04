@@ -41,7 +41,7 @@ import {
   stripHtml,
   detectAmenitySignal,
   detectHeatingType,
-  detectSourceUnavailableSignal,
+  detectSourceUnavailableSignalFromHtml,
 } from "./shared/text-signals";
 
 const DOMAINS = ["lystio.at", "www.lystio.at"];
@@ -99,7 +99,7 @@ export function parseLystioListing(
   html: string,
   fallbackUrl: string,
 ): NormalizedListing {
-  const unavailableSignal = detectSourceUnavailableSignal(html);
+  const unavailableSignal = detectSourceUnavailableSignalFromHtml(html);
   if (unavailableSignal) {
     throw new NonListingPageError(
       unavailableSignal === "GONE"

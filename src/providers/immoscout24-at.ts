@@ -30,7 +30,7 @@ import {
   detectHeatingType,
   detectContractType,
   detectAmenitySignal,
-  detectSourceUnavailableSignal,
+  detectSourceUnavailableSignalFromHtml,
 } from "./shared/text-signals";
 
 const DOMAINS = ["immobilienscout24.at", "www.immobilienscout24.at"];
@@ -186,7 +186,7 @@ export function parseIS24Listing(
   html: string,
   fallbackUrl: string,
 ): NormalizedListing {
-  const unavailableSignal = detectSourceUnavailableSignal(html);
+  const unavailableSignal = detectSourceUnavailableSignalFromHtml(html);
   if (unavailableSignal) {
     throw new NonListingPageError(
       unavailableSignal === "GONE"

@@ -29,7 +29,7 @@ import {
   stripHtml,
   detectHeatingType,
   detectContractType,
-  detectSourceUnavailableSignal,
+  detectSourceUnavailableSignalFromHtml,
 } from "./shared/text-signals";
 
 const DOMAINS = ["willhaben.at", "www.willhaben.at"];
@@ -95,7 +95,7 @@ export function parseWillhabenListing(
   html: string,
   fallbackUrl: string,
 ): NormalizedListing {
-  const unavailableSignal = detectSourceUnavailableSignal(html);
+  const unavailableSignal = detectSourceUnavailableSignalFromHtml(html);
   if (unavailableSignal) {
     throw new NonListingPageError(
       unavailableSignal === "GONE"

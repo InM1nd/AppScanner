@@ -49,6 +49,26 @@ class TransportTests(unittest.TestCase):
         )
         self.assertEqual(result.transport, "browser")
 
+    def test_rejects_immoscout_robot_challenge_and_tries_next_transport(self):
+        def blocked(url):
+            return FetchResult(
+                "<html><title>Ich bin kein Roboter</title></html>",
+                url,
+                "curl",
+                200,
+            )
+
+        def succeed(url):
+            return FetchResult("<html>listing</html>", url, "browser", 200)
+
+        result = fetch_with_cascade(
+            "https://www.immobilienscout24.at/expose/1",
+            ("curl", "browser"),
+            {"curl": blocked, "browser": succeed},
+        )
+
+        self.assertEqual(result.transport, "browser")
+
 
 if __name__ == "__main__":
     unittest.main()

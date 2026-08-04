@@ -14,6 +14,19 @@ export const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const MIN_DELAY_MS = Number(process.env.SCRAPER_MIN_DELAY_MS ?? 4000);
 
+function validateFetchedHtml(html: string): string {
+  const lower = html.slice(0, 150_000).toLowerCase();
+  if (
+    lower.includes("ich bin kein roboter") ||
+    lower.includes("fälschlicherweise als roboter identifiziert")
+  )
+    throw new SafeFetchError(
+      "Fetch returned an anti-bot challenge page.",
+      true,
+    );
+  return html;
+}
+
 export async function fetchHtml(
   url: string,
   allowedHosts?: readonly string[],
@@ -22,7 +35,11 @@ export async function fetchHtml(
   const host = new URL(url).hostname;
   const fallback = useWorkerFallback ? getScraperWorkerFallback() : null;
 
-  const allowed = await isFetchAllowedByRobots(url, BROWSER_USER_AGENT, fallback);
+  const allowed = await isFetchAllowedByRobots(
+    url,
+    BROWSER_USER_AGENT,
+    fallback,
+  );
   if (!allowed) {
     throw new Error(
       `robots.txt for ${host} disallows fetching this path. Use manual entry instead.`,
@@ -31,11 +48,13 @@ export async function fetchHtml(
 
   await waitForRateLimit(host, MIN_DELAY_MS);
 
-  const nativeFetch = () =>
-    safeFetchText(url, {
-      allowedHosts,
-      userAgent: BROWSER_USER_AGENT,
-    });
+  const nativeFetch = async () =>
+    validateFetchedHtml(
+      await safeFetchText(url, {
+        allowedHosts,
+        userAgent: BROWSER_USER_AGENT,
+      }),
+    );
 
   try {
     return await nativeFetch();
@@ -70,6 +89,6 @@ export async function fetchHtml(
         status: result.status,
       }),
     );
-    return result.html;
+    return validateFetchedHtml(result.html);
   }
 }

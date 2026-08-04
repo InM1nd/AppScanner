@@ -79,6 +79,13 @@ describe("parseLystioListing", () => {
       );
     }
   });
+
+  it("ignores a hidden Next.js 404 payload on a live listing", () => {
+    const liveWithRscFallback = `${html}<script>self.__next_f.push(["This listing is no longer available."])</script>`;
+    expect(parseLystioListing(liveWithRscFallback, url).title).toContain(
+      "Bright apartment",
+    );
+  });
 });
 
 describe("lystioProvider.importFromUrl AI fallback", () => {
