@@ -13,6 +13,12 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   month: "short",
   year: "numeric",
 });
+const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 export function formatEur(
   amount: number | null | undefined,
@@ -27,6 +33,11 @@ export function formatEur(
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "—";
   return dateFormatter.format(new Date(date));
+}
+
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return "—";
+  return dateTimeFormatter.format(new Date(date));
 }
 
 export function formatRelativeTime(date: Date | string): string {

@@ -14,8 +14,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useTranslations } from "@/i18n/locale-context";
-import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
+import { bestIndexes } from "@/lib/compare";
+import { Columns3, Plus, X } from "lucide-react";
 
 const SLOTS = [0, 1, 2, 3];
 
@@ -26,69 +30,168 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
   const selected = ids
     .map((id) => listings.find((l) => l.id === id))
     .filter(Boolean) as ListingCardVM[];
+
+  // With fewer than two listings there is nothing to differ, so the filter
+  // would hide every row and leave an unexplained empty table.
+  const canDiff = selected.length >= 2;
+  const diffing = onlyDifferences && canDiff;
   const show = (values: unknown[]) =>
-    !onlyDifferences ||
-    new Set(values.map((value) => JSON.stringify(value))).size > 1;
+    !diffing || new Set(values.map((value) => JSON.stringify(value))).size > 1;
+
+  function setSlot(slot: number, value: string) {
+    setIds((prev) => prev.map((p, i) => (i === slot ? value : p)));
+  }
 
   return (
     <div className="space-y-6">
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {SLOTS.map((slot) => (
-          <Select
-            key={slot}
-            value={ids[slot]}
-            onValueChange={(v) =>
-              v !== null &&
-              setIds((prev) => prev.map((p, i) => (i === slot ? v : p)))
-            }
-          >
-            <SelectTrigger
-              className="h-9"
-              aria-label={`${t("compare.slot")} ${slot + 1}`}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {SLOTS.map((slot) => {
+          const listing = listings.find((l) => l.id === ids[slot]);
+          return (
+            <div
+              key={slot}
+              className={cn(
+                "rounded-xl p-3 transition-colors",
+                listing
+                  ? "bg-card ring-1 ring-foreground/10 elevate"
+                  : "border border-dashed border-border",
+              )}
             >
-              <SelectValue
-                placeholder={`${t("compare.slot")} ${slot + 1}: ${t("compare.chooseListing")}`}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {listings.map((l) => (
-                <SelectItem key={l.id} value={l.id}>
-                  {l.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ))}
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  {t("compare.slot")} {slot + 1}
+                </span>
+                {listing && (
+                  <button
+                    type="button"
+                    onClick={() => setSlot(slot, "")}
+                    aria-label={t("compare.clearSlot")}
+                    className="rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {listing ? (
+                <div className="space-y-2">
+                  <Link
+                    href={`/listings/${listing.id}`}
+                    title={listing.title}
+                    className="line-clamp-2 text-sm font-medium leading-snug hover:text-primary hover:underline"
+                  >
+                    {listing.title}
+                  </Link>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold tabular-nums">
+                      {formatEur(listing.monthlyLikelyTotal)}
+                    </span>
+                    <ScoreBadge
+                      score={listing.scoreBreakdown?.totalScore ?? 0}
+                      isZeroed={listing.scoreBreakdown?.isZeroed}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <Select
+                  value=""
+                  onValueChange={(v) => v !== null && setSlot(slot, v)}
+                >
+                  <SelectTrigger
+                    className="h-9 w-full"
+                    aria-label={`${t("compare.slot")} ${slot + 1}`}
+                  >
+                    <SelectValue placeholder={t("compare.addListing")}>
+                      {() => (
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <Plus className="size-3.5" />
+                          {t("compare.addListing")}
+                        </span>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {listings.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <Checkbox
-          checked={onlyDifferences}
-          onCheckedChange={(checked) => setOnlyDifferences(Boolean(checked))}
-        />
-        Show differences only
-      </label>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          <Switch
+            checked={onlyDifferences}
+            disabled={!canDiff}
+            onCheckedChange={(checked) => setOnlyDifferences(Boolean(checked))}
+          />
+          {t("compare.showDifferences")}
+        </label>
+        {!canDiff && (
+          <span className="text-xs text-muted-foreground">
+            {t("compare.showDifferencesHint")}
+          </span>
+        )}
+      </div>
 
       {selected.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {t("compare.emptyState")}
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+          <Columns3 className="size-7 text-muted-foreground/40" />
+          <p className="max-w-sm text-sm text-muted-foreground">
+            {t("compare.emptyState")}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={<Link href="/listings" />}
+          >
+            {t("nav.listings")}
+          </Button>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10">
           <table className="w-full text-sm">
-            <tbody>
-              <Row
-                label={t("compare.rowListing")}
-                cells={selected.map((l) => (
-                  <Link
+            <thead className="sticky top-0 z-20 bg-muted/90 backdrop-blur">
+              <tr>
+                <th
+                  scope="col"
+                  className="sticky left-0 z-30 w-44 bg-muted/90 p-3 text-left text-xs font-medium text-muted-foreground"
+                >
+                  {t("compare.rowListing")}
+                </th>
+                {selected.map((l) => (
+                  <th
                     key={l.id}
-                    href={`/listings/${l.id}`}
-                    className="font-medium hover:underline"
+                    scope="col"
+                    className="p-3 text-left align-top"
                   >
-                    {l.title}
-                  </Link>
+                    <Link
+                      href={`/listings/${l.id}`}
+                      title={l.title}
+                      className="line-clamp-2 font-medium hover:text-primary hover:underline"
+                    >
+                      {l.title}
+                    </Link>
+                    <div className="mt-1.5">
+                      <ScoreBadge
+                        score={l.scoreBreakdown?.totalScore ?? 0}
+                        isZeroed={l.scoreBreakdown?.isZeroed}
+                        size="sm"
+                      />
+                    </div>
+                  </th>
                 ))}
-              />
+              </tr>
+            </thead>
+            <tbody>
               {show(selected.map((l) => l.status)) && (
                 <Row
                   label={t("compare.rowStatus")}
@@ -100,6 +203,15 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
               {show(selected.map((l) => l.scoreBreakdown?.totalScore)) && (
                 <Row
                   label={t("compare.rowScore")}
+                  best={bestIndexes(
+                    selected.map((l) =>
+                      l.scoreBreakdown?.isZeroed
+                        ? null
+                        : l.scoreBreakdown?.totalScore,
+                    ),
+                    "max",
+                  )}
+                  bestLabel={t("compare.best")}
                   cells={selected.map((l) => (
                     <ScoreBadge
                       key={l.id}
@@ -113,7 +225,12 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
                 selected.map((l) => l.scoreBreakdown?.dataCompleteness),
               ) && (
                 <Row
-                  label="Data completeness"
+                  label={t("compare.rowCompleteness")}
+                  best={bestIndexes(
+                    selected.map((l) => l.scoreBreakdown?.dataCompleteness),
+                    "max",
+                  )}
+                  bestLabel={t("compare.best")}
                   cells={selected.map(
                     (l) => `${l.scoreBreakdown?.dataCompleteness ?? 0}%`,
                   )}
@@ -128,8 +245,15 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
               {show(selected.map((l) => l.monthlyLikelyTotal)) && (
                 <Row
                   label={t("compare.rowMonthlyTotal")}
+                  best={bestIndexes(
+                    selected.map((l) => l.monthlyLikelyTotal),
+                    "min",
+                  )}
+                  bestLabel={t("compare.best")}
                   cells={selected.map((l) => (
-                    <b key={l.id}>{formatEur(l.monthlyLikelyTotal)}</b>
+                    <b key={l.id} className="tabular-nums">
+                      {formatEur(l.monthlyLikelyTotal)}
+                    </b>
                   ))}
                 />
               )}
@@ -155,6 +279,11 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
               ) && (
                 <Row
                   label={t("compare.rowCommute")}
+                  best={bestIndexes(
+                    selected.map((l) => l.commuteEstimates[0]?.durationMinutes),
+                    "min",
+                  )}
+                  bestLabel={t("compare.best")}
                   cells={selected.map((l) => (
                     <CommuteValue
                       key={l.id}
@@ -167,18 +296,27 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
               {show(selected.map((l) => [l.rooms, l.hasSeparateBedroom])) && (
                 <Row
                   label={t("compare.rowLayout")}
-                  cells={selected.map(
-                    (l) =>
-                      `${l.rooms ?? "?"} · ${l.hasSeparateBedroom === "YES" ? "✓" : "—"}`,
-                  )}
+                  cells={selected.map((l) => (
+                    <span key={l.id}>
+                      <span className="tabular-nums">{l.rooms ?? "—"}</span>{" "}
+                      {t("compare.layoutRooms")}
+                      {l.hasSeparateBedroom === "YES" && (
+                        <span className="block text-xs text-muted-foreground">
+                          {t("compare.layoutSeparateBedroom")}
+                        </span>
+                      )}
+                    </span>
+                  ))}
                 />
               )}
               {show(selected.map((l) => l.parkingAvailability)) && (
                 <Row
                   label={t("compare.rowParking")}
-                  cells={selected.map((l) =>
-                    l.parkingAvailability.replace(/_/g, " ").toLowerCase(),
-                  )}
+                  cells={selected.map((l) => (
+                    <span key={l.id}>
+                      {t(`parking.${l.parkingAvailability}`)}
+                    </span>
+                  ))}
                 />
               )}
               {show(selected.map((l) => l.costRedFlags)) && (
@@ -186,10 +324,7 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
                   label={t("compare.rowHiddenCost")}
                   cells={selected.map((l) => {
                     return l.costRedFlags.length === 0 ? (
-                      <span
-                        key={l.id}
-                        className="text-emerald-600 dark:text-emerald-400 text-xs"
-                      >
+                      <span key={l.id} className="text-xs text-success">
                         {t("compare.noFlags")}
                       </span>
                     ) : (
@@ -200,7 +335,7 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
                             variant="destructive"
                             className="text-[10px]"
                           >
-                            {f.replace(/_/g, " ").toLowerCase()}
+                            {t(`redFlag.${f}`)}
                           </Badge>
                         ))}
                       </div>
@@ -216,25 +351,46 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
   );
 }
 
-function Row({ label, cells }: { label: string; cells: React.ReactNode[] }) {
+function Row({
+  label,
+  cells,
+  best,
+  bestLabel,
+}: {
+  label: string;
+  cells: React.ReactNode[];
+  best?: Set<number>;
+  bestLabel?: string;
+}) {
   return (
-    <tr className="border-b border-border last:border-0">
+    <tr className="border-b border-border/70 last:border-0">
       <th
         scope="row"
-        className="sticky left-0 z-10 w-40 whitespace-nowrap bg-muted p-3 text-left text-xs font-medium text-muted-foreground"
+        className="sticky left-0 z-10 w-44 whitespace-nowrap bg-muted p-3 text-left text-xs font-medium text-muted-foreground"
       >
         {label}
       </th>
-      {cells.map((c, i) => (
-        <td key={i} className="p-3 align-top">
-          {c}
-        </td>
-      ))}
+      {cells.map((c, i) => {
+        const isBest = best?.has(i) ?? false;
+        return (
+          <td key={i} className="p-3 align-top">
+            <span className="inline-flex items-baseline gap-1.5">
+              {c}
+              {isBest && (
+                <span className="rounded-full bg-success/12 px-1.5 py-0.5 text-[10px] font-semibold text-success">
+                  {bestLabel}
+                </span>
+              )}
+            </span>
+          </td>
+        );
+      })}
     </tr>
   );
 }
 
 function UpfrontValue({ listing }: { listing: ListingCardVM }) {
+  const { t } = useTranslations();
   if (!listing.hasUnknownUpfrontCost) {
     return (
       <span className="tabular-nums">
@@ -247,11 +403,13 @@ function UpfrontValue({ listing }: { listing: ListingCardVM }) {
     .join(", ");
   return (
     <span className="block max-w-56 text-xs leading-5">
-      At least{" "}
+      {t("compare.upfrontAtLeast")}{" "}
       <strong className="tabular-nums">
         {formatEur(listing.upfrontCostEstimate)}
-      </strong>{" "}
-      + unknown {unknown || "costs"}
+      </strong>
+      <span className="block text-muted-foreground">
+        {t("compare.upfrontPlusUnknown")} {unknown || t("compare.upfrontCosts")}
+      </span>
     </span>
   );
 }
@@ -263,7 +421,8 @@ function CommuteValue({
   estimate: ListingCardVM["commuteEstimates"][number] | undefined;
   unit: string;
 }) {
-  if (!estimate || estimate.durationMinutes === null) return <span>—</span>;
+  if (!estimate || estimate.durationMinutes === null)
+    return <span className="text-muted-foreground">—</span>;
   const approximate = estimate.provider.toLowerCase() === "mock";
   return (
     <span className="block whitespace-nowrap">

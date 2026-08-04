@@ -1,24 +1,41 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { useTranslations } from "@/i18n/locale-context";
+import { cn } from "@/lib/utils";
 import type { ListingStatus } from "@prisma/client";
 
-const STATUS_STYLES: Record<ListingStatus, string> = {
-  NEW: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
-  REVIEWING: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
-  CONTACTED: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  VIEWING: "bg-orange-500/15 text-orange-700 dark:text-orange-400",
-  SHORTLISTED: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
-  REJECTED: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
-  ARCHIVED: "bg-muted text-muted-foreground",
+// Status reads as a neutral chip with a coloured dot: the pipeline stage is
+// carried by the dot, so the loud colour ramp stays reserved for ScoreBadge.
+const STATUS_DOT: Record<ListingStatus, string> = {
+  NEW: "bg-info",
+  REVIEWING: "bg-info/60",
+  CONTACTED: "bg-warning",
+  VIEWING: "bg-warning/70",
+  SHORTLISTED: "bg-success",
+  REJECTED: "bg-danger",
+  ARCHIVED: "bg-muted-foreground/50",
 };
 
-export function StatusBadge({ status }: { status: ListingStatus }) {
+export function StatusBadge({
+  status,
+  className,
+}: {
+  status: ListingStatus;
+  className?: string;
+}) {
   const { t } = useTranslations();
   return (
-    <Badge className={`${STATUS_STYLES[status]} border-0 font-medium`}>
+    <span
+      className={cn(
+        "inline-flex h-5 w-fit shrink-0 items-center gap-1.5 rounded-full bg-muted px-2 text-xs font-medium whitespace-nowrap text-foreground/75",
+        className,
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn("size-1.5 rounded-full", STATUS_DOT[status])}
+      />
       {t(`status.${status}`)}
-    </Badge>
+    </span>
   );
 }

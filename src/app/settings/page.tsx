@@ -36,7 +36,7 @@ export default async function SettingsPage() {
     process.env.ROUTING_PROVIDER === "google" ? "google" : "mock";
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-10">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{s.title}</h1>
@@ -50,36 +50,71 @@ export default async function SettingsPage() {
         </div>
       </div>
 
-      <SearchProfileForm initial={profileFormValue} />
-      <ScoringWeightsForm initial={profile.scoringWeights} />
-      <TelegramTestPanel configured={isTelegramConfigured()} />
+      <Section title={s.sectionSearch} description={s.sectionSearchDesc}>
+        <SearchProfileForm initial={profileFormValue} />
+        <ScoringWeightsForm initial={profile.scoringWeights} />
+      </Section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            {s.routingProvider}
-            <Badge
-              variant={routingProvider === "google" ? "default" : "outline"}
-              className="text-[11px]"
-            >
-              {routingProvider}
-            </Badge>
-          </CardTitle>
-          <CardDescription>{s.routingProviderDesc}</CardDescription>
-        </CardHeader>
-      </Card>
+      <Section
+        title={s.sectionIntegrations}
+        description={s.sectionIntegrationsDesc}
+      >
+        {/* Both are read-only status panels of the same shape, so a 2-up grid
+            keeps them from eating a full screen of vertical space. */}
+        <div className="grid gap-4 lg:grid-cols-2 [&>*]:h-full">
+          <TelegramTestPanel configured={isTelegramConfigured()} />
+          <Card className="elevate">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                {s.routingProvider}
+                <Badge
+                  variant={routingProvider === "google" ? "default" : "outline"}
+                  className="text-[11px]"
+                >
+                  {routingProvider}
+                </Badge>
+              </CardTitle>
+              <CardDescription>{s.routingProviderDesc}</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </Section>
 
-      <ProfileExportImport
-        profile={profileFormValue}
-        weights={profile.scoringWeights}
-      />
-
-      <RefreshListingsPanel />
-
-      <div>
-        <h2 className="text-lg font-semibold mb-3">{s.providerSetup}</h2>
-        <ProviderSetupPanel />
-      </div>
+      <Section title={s.sectionData} description={s.sectionDataDesc}>
+        <div className="grid gap-4 lg:grid-cols-2 [&>*]:h-full">
+          <ProfileExportImport
+            profile={profileFormValue}
+            weights={profile.scoringWeights}
+          />
+          <RefreshListingsPanel />
+        </div>
+        <div>
+          <h3 className="mb-3 text-sm font-medium text-muted-foreground">
+            {s.providerSetup}
+          </h3>
+          <ProviderSetupPanel />
+        </div>
+      </Section>
     </div>
+  );
+}
+
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="border-b border-border pb-2">
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+      </div>
+      {children}
+    </section>
   );
 }

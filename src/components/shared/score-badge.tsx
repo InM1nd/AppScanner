@@ -1,27 +1,14 @@
 import { cn } from "@/lib/utils";
 
+// One quality ramp for score. Status hue lives on a separate axis (a dot in
+// StatusBadge) so the two never compete for the same colour meaning.
 function bandForScore(score: number) {
   if (score >= 80)
-    return {
-      label: "Excellent",
-      classes:
-        "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 ring-emerald-500/30",
-    };
-  if (score >= 60)
-    return {
-      label: "Good",
-      classes: "bg-sky-500/15 text-sky-700 dark:text-sky-400 ring-sky-500/30",
-    };
+    return { label: "Excellent", classes: "bg-success/12 text-success" };
+  if (score >= 60) return { label: "Good", classes: "bg-info/12 text-info" };
   if (score >= 40)
-    return {
-      label: "Fair",
-      classes:
-        "bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-amber-500/30",
-    };
-  return {
-    label: "Weak",
-    classes: "bg-rose-500/15 text-rose-700 dark:text-rose-400 ring-rose-500/30",
-  };
+    return { label: "Fair", classes: "bg-warning/14 text-warning" };
+  return { label: "Weak", classes: "bg-danger/12 text-danger" };
 }
 
 export function ScoreBadge({
@@ -35,7 +22,7 @@ export function ScoreBadge({
 }) {
   if (isZeroed) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset bg-muted text-muted-foreground ring-border">
+      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">
         Excluded
       </span>
     );
@@ -49,14 +36,15 @@ export function ScoreBadge({
         : "text-xs px-2 py-0.5";
   return (
     <span
+      title={band.label}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full font-semibold ring-1 ring-inset tabular-nums",
+        "inline-flex items-center gap-0.5 rounded-full font-semibold tabular-nums",
         band.classes,
         sizeClasses,
       )}
     >
       {score}
-      <span className="font-normal">/100</span>
+      <span className="font-normal opacity-60">/100</span>
     </span>
   );
 }

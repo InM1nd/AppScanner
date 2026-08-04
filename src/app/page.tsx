@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { listAllListings } from "@/server/queries";
-import { formatEur, formatRelativeTime, districtLabel } from "@/lib/format";
+import { formatEur } from "@/lib/format";
 import { daysAgo } from "@/lib/time";
 import { getTopMatches } from "@/lib/dashboard";
 import { getDictionary } from "@/i18n/server";
-import { ScoreBadge } from "@/components/shared/score-badge";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { ListingRow, EmptyRow } from "@/components/shared/listing-row";
 import { TrendsCard } from "@/components/dashboard/trends-card";
 import {
   Card,
@@ -15,13 +14,16 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import type { ProviderHealth } from "@prisma/client";
 import {
   AlertTriangle,
   ArrowRight,
   Building2,
+  CircleDollarSign,
+  Gauge,
   Radio,
-  TrendingUp,
+  Star,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -113,16 +115,19 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">{d.title}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{d.subtitle}</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+            {d.subtitle}
+          </p>
         </div>
         <Link
           href="/import"
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium px-3.5 py-2 hover:opacity-90 transition-opacity"
+          className="group inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium px-4 py-2.5 elevate transition-[transform,filter] hover:brightness-110 active:scale-[0.98]"
         >
-          {d.importListing} <ArrowRight className="size-3.5" />
+          {d.importListing}
+          <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
 
@@ -130,33 +135,37 @@ export default async function DashboardPage() {
         <StatCard
           label={d.statActive}
           value={String(activeCount)}
+          hint={d.statActiveHint}
           icon={Building2}
         />
         <StatCard
           label={d.statShortlisted}
           value={String(shortlistedCount)}
-          icon={TrendingUp}
+          hint={d.statShortlistedHint}
+          icon={Star}
         />
         <StatCard
           label={d.statAvgCost}
           value={avgKnownCost !== null ? formatEur(avgKnownCost) : "—"}
-          icon={TrendingUp}
+          hint={d.statAvgCostHint}
+          icon={CircleDollarSign}
         />
         <StatCard
           label={d.statAvgScore}
           value={avgScore !== null ? `${avgScore}/100` : "—"}
-          icon={TrendingUp}
+          hint={d.statAvgScoreHint}
+          icon={Gauge}
         />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card>
+          <Card className="elevate">
             <CardHeader>
               <CardTitle className="text-base">{d.topMatches}</CardTitle>
               <CardDescription>{d.topMatchesDesc}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-1">
+            <CardContent className="space-y-0.5">
               {topMatches.length === 0 && <EmptyRow text={d.topMatchesEmpty} />}
               {topMatches.map((l) => (
                 <ListingRow key={l.id} listing={l} />
@@ -177,12 +186,12 @@ export default async function DashboardPage() {
             }}
           />
 
-          <Card>
+          <Card className="elevate">
             <CardHeader>
               <CardTitle className="text-base">{d.newSince}</CardTitle>
               <CardDescription>{d.newSinceDesc}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-1">
+            <CardContent className="space-y-0.5">
               {newListings.length === 0 && <EmptyRow text={d.newSinceEmpty} />}
               {newListings.slice(0, 8).map((l) => (
                 <ListingRow key={l.id} listing={l} />
@@ -192,10 +201,15 @@ export default async function DashboardPage() {
         </div>
 
         <div className="space-y-6">
-          <Card>
+          <Card className="elevate">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <AlertTriangle className="size-4 text-amber-500" /> {d.urgent}
+                <AlertTriangle className="size-4 text-warning" /> {d.urgent}
+                {urgent.length > 0 && (
+                  <span className="ml-auto rounded-full bg-warning/12 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-warning">
+                    {urgent.length}
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -204,9 +218,9 @@ export default async function DashboardPage() {
                 <Link
                   key={l.id}
                   href={`/listings/${l.id}`}
-                  className="block rounded-md border border-border p-2.5 hover:bg-accent/50 transition-colors"
+                  className="block rounded-lg border border-border p-2.5 transition-colors hover:border-warning/40 hover:bg-warning/5"
                 >
-                  <div className="text-sm font-medium leading-tight">
+                  <div className="text-sm font-medium leading-tight line-clamp-2">
                     {l.title}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
@@ -219,33 +233,35 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="elevate">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <Radio className="size-4" /> {d.sourcesHealth}
+                <Radio className="size-4 text-muted-foreground" />{" "}
+                {d.sourcesHealth}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2.5">
               {providers.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between text-sm"
+                  className="flex items-center justify-between gap-2 text-sm"
                 >
-                  <span>{p.displayName}</span>
-                  <Badge variant="outline" className="text-[11px]">
-                    {p.healthStatus}
-                  </Badge>
+                  <span className="truncate">{p.displayName}</span>
+                  <HealthPill
+                    status={p.healthStatus}
+                    label={d[`health${p.healthStatus}`]}
+                  />
                 </div>
               ))}
               {providers.length === 0 && <EmptyRow text={d.sourcesEmpty} />}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="elevate">
             <CardHeader>
               <CardTitle className="text-base">{d.savedSearches}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-1">
               {savedSearches.length === 0 && (
                 <EmptyRow text={d.savedSearchesEmpty} />
               )}
@@ -255,11 +271,11 @@ export default async function DashboardPage() {
                   href={s.searchUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="block text-sm hover:underline"
+                  className="-mx-2 flex items-baseline gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent/40"
                 >
-                  {s.label}{" "}
-                  <span className="text-muted-foreground text-xs">
-                    ({s.provider.displayName})
+                  <span className="truncate">{s.label}</span>
+                  <span className="ml-auto shrink-0 text-muted-foreground text-xs">
+                    {s.provider.displayName}
                   </span>
                 </a>
               ))}
@@ -274,61 +290,59 @@ export default async function DashboardPage() {
 function StatCard({
   label,
   value,
+  hint,
   icon: Icon,
 }: {
   label: string;
   value: string;
+  hint?: string;
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <Card className="py-4">
-      <CardContent className="flex items-center justify-between px-4">
-        <div>
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="text-xl font-semibold tabular-nums mt-0.5">
+    <Card className="elevate py-4 transition-colors hover:ring-primary/25">
+      <CardContent className="flex items-start justify-between gap-3 px-4">
+        <div className="min-w-0">
+          <div className="text-xs font-medium text-muted-foreground">
+            {label}
+          </div>
+          <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">
             {value}
           </div>
+          {hint && (
+            <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70 line-clamp-2">
+              {hint}
+            </div>
+          )}
         </div>
-        <Icon className="size-5 text-muted-foreground/50" />
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/8 text-primary">
+          <Icon className="size-4" />
+        </span>
       </CardContent>
     </Card>
   );
 }
 
-function ListingRow({
-  listing,
+const HEALTH_TONE: Record<ProviderHealth, string> = {
+  OK: "bg-success",
+  DEGRADED: "bg-warning",
+  DOWN: "bg-danger",
+  UNKNOWN: "bg-muted-foreground/40",
+};
+
+function HealthPill({
+  status,
+  label,
 }: {
-  listing: Awaited<ReturnType<typeof listAllListings>>[number];
+  status: ProviderHealth;
+  label: string;
 }) {
   return (
-    <Link
-      href={`/listings/${listing.id}`}
-      className="flex items-center gap-3 rounded-md p-2 hover:bg-accent/50 transition-colors"
-    >
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium truncate">{listing.title}</div>
-        <div className="text-xs text-muted-foreground">
-          {districtLabel(listing.district)} ·{" "}
-          {formatEur(
-            listing.monthlyLikelyTotal
-              ? Number(listing.monthlyLikelyTotal)
-              : null,
-          )}
-          /mo · {formatRelativeTime(listing.importedAt)}
-        </div>
-      </div>
-      <StatusBadge status={listing.status} />
-      <ScoreBadge
-        score={listing.scoreBreakdown?.totalScore ?? 0}
-        isZeroed={listing.scoreBreakdown?.isZeroed}
+    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground/75">
+      <span
+        aria-hidden
+        className={cn("size-1.5 rounded-full", HEALTH_TONE[status])}
       />
-      <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
-        {listing.scoreBreakdown?.dataCompleteness ?? 0}%
-      </span>
-    </Link>
+      {label}
+    </span>
   );
-}
-
-function EmptyRow({ text }: { text: string }) {
-  return <div className="text-sm text-muted-foreground py-3 px-1">{text}</div>;
 }

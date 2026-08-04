@@ -2,14 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Search,
-  LayoutDashboard,
-  Building2,
-  PlusSquare,
-  Columns3,
-  Settings,
-} from "lucide-react";
+import { Search, Building2 } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -20,6 +13,7 @@ import {
 } from "@/components/ui/command";
 import { useTranslations } from "@/i18n/locale-context";
 import { districtLabel } from "@/lib/format";
+import { NAV_GROUPS } from "./nav-items";
 
 interface SearchListing {
   id: string;
@@ -64,13 +58,7 @@ export function CommandPaletteTrigger() {
     router.push(href);
   }
 
-  const pages = [
-    { href: "/", key: "nav.dashboard", icon: LayoutDashboard },
-    { href: "/listings", key: "nav.listings", icon: Building2 },
-    { href: "/import", key: "nav.import", icon: PlusSquare },
-    { href: "/compare", key: "nav.compare", icon: Columns3 },
-    { href: "/settings", key: "nav.settings", icon: Settings },
-  ];
+  const pages = NAV_GROUPS.flatMap((group) => group.items);
 
   return (
     <>

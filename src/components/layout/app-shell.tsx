@@ -11,7 +11,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <SidebarNav />
-      <div className="md:pl-56 flex min-h-full flex-col">
+      <div className="md:pl-60 flex min-h-full flex-col">
         <MobileNav />
         <main className="flex-1">{children}</main>
       </div>

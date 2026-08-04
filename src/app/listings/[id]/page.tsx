@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/server/current-user";
 import { db } from "@/lib/db";
 import { getDictionary } from "@/i18n/server";
 import { districtLabel, formatDate, enumLabel } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -42,6 +43,8 @@ export default async function ListingDetailPage({
     UNKNOWN: ld.unconfirmed,
   };
 
+  const UNKNOWN_LABELS = [c.unknown, ld.unconfirmed, ld.notCalculated];
+
   const user = await getCurrentUser();
   const watching = await db.watchlistItem.findUnique({
     where: { userId_listingId: { userId: user.id, listingId: id } },
@@ -69,23 +72,26 @@ export default async function ListingDetailPage({
         <ArrowLeft className="size-3.5" /> {c.backToListings}
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1">
+          <h1
+            title={listing.title}
+            className="line-clamp-2 text-2xl font-semibold tracking-tight"
+          >
             {listing.title}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1.5">
             {districtLabel(listing.district)} · {listing.address ?? c.unknown} ·
             via {listing.provider.displayName}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-3">
           <StatusBadge status={listing.status} />
           <a
             href={listing.canonicalUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-input px-3 py-1.5 text-sm transition-colors hover:border-primary/40 hover:text-primary"
           >
             {c.openSource} <ExternalLink className="size-3.5" />
           </a>
@@ -104,7 +110,7 @@ export default async function ListingDetailPage({
         <div className="lg:col-span-2 space-y-6">
           <PhotoGallery photos={listing.photos} title={listing.title} />
 
-          <Card>
+          <Card className="elevate">
             <CardHeader>
               <CardTitle className="text-base">{ld.details}</CardTitle>
             </CardHeader>
@@ -112,6 +118,7 @@ export default async function ListingDetailPage({
               <Row
                 label={ld.rooms}
                 value={listing.rooms ? String(listing.rooms) : c.unknown}
+                unknownLabels={UNKNOWN_LABELS}
               />
               <Row
                 label={ld.size}
@@ -120,39 +127,51 @@ export default async function ListingDetailPage({
                     ? `${listing.squareMeters} m²`
                     : c.unknown
                 }
+                unknownLabels={UNKNOWN_LABELS}
               />
               <Row
                 label={ld.separateBedroom}
                 value={TRI_LABEL[listing.hasSeparateBedroom]}
+                unknownLabels={UNKNOWN_LABELS}
               />
               <Row
                 label={ld.furnished}
                 value={enumLabel(listing.furnishedLevel)}
+                unknownLabels={UNKNOWN_LABELS}
               />
               <Row
                 label={ld.contractType}
                 value={enumLabel(listing.contractType)}
+                unknownLabels={UNKNOWN_LABELS}
               />
               <Row
                 label={ld.availability}
                 value={formatDate(listing.availabilityDate)}
+                unknownLabels={UNKNOWN_LABELS}
               />
               <Row
                 label={ld.importMethod}
                 value={enumLabel(listing.importMethod)}
+                unknownLabels={UNKNOWN_LABELS}
               />
               <Row
                 label={ld.energyRating}
                 value={listing.energyRating ?? c.unknown}
+                unknownLabels={UNKNOWN_LABELS}
               />
               {amenities.map(([label, value]) => (
-                <Row key={label} label={label} value={value} />
+                <Row
+                  key={label}
+                  label={label}
+                  value={value}
+                  unknownLabels={UNKNOWN_LABELS}
+                />
               ))}
             </CardContent>
           </Card>
 
           {listing.description && (
-            <Card>
+            <Card className="elevate">
               <CardHeader>
                 <CardTitle className="text-base">{ld.description}</CardTitle>
               </CardHeader>
@@ -172,12 +191,6 @@ export default async function ListingDetailPage({
             upfrontCostLabel={ld.upfrontCost}
           />
           <NotesSection listingId={listing.id} notes={listing.notes} />
-          <TimelineSection
-            snapshots={listing.snapshots}
-            title={ld.timeline}
-            fieldLabels={ld.timelineFields}
-            unknownLabel={c.unknown}
-          />
         </div>
 
         <div className="space-y-6">
@@ -204,7 +217,7 @@ export default async function ListingDetailPage({
           />
           <ViewingChecklist />
           {listing.rejectionReason && (
-            <Card>
+            <Card className="elevate">
               <CardHeader>
                 <CardTitle className="text-base">
                   {ld.rejectionReason}
@@ -215,17 +228,41 @@ export default async function ListingDetailPage({
               </CardContent>
             </Card>
           )}
+          <TimelineSection
+            snapshots={listing.snapshots}
+            title={ld.timeline}
+            fieldLabels={ld.timelineFields}
+            unknownLabel={c.unknown}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  value,
+  unknownLabels,
+}: {
+  label: string;
+  value: string;
+  unknownLabels: string[];
+}) {
+  // Honest-data principle: a value we don't have must not look like a fact we
+  // do have, so unknowns drop to muted body weight.
+  const isUnknown = value === "—" || unknownLabels.includes(value);
   return (
-    <div className="flex items-center justify-between border-b border-border/50 py-1.5">
+    <div className="flex items-baseline justify-between gap-3 border-b border-border/50 py-2">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-right">{value}</span>
+      <span
+        className={cn(
+          "text-right",
+          isUnknown ? "text-muted-foreground/60" : "font-medium",
+        )}
+      >
+        {value}
+      </span>
     </div>
   );
 }

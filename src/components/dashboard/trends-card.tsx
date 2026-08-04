@@ -16,6 +16,15 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 
+const TOOLTIP_STYLE: React.CSSProperties = {
+  background: "var(--color-popover)",
+  color: "var(--color-popover-foreground)",
+  border: "1px solid var(--color-border)",
+  borderRadius: "var(--radius-md)",
+  fontSize: 12,
+  boxShadow: "0 4px 14px -6px oklch(0 0 0 / 25%)",
+};
+
 export interface DailyImportPoint {
   date: string;
   count: number;
@@ -63,18 +72,22 @@ export function TrendsCard({
               <BarChart data={imports}>
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 10 }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   tickLine={false}
                   axisLine={false}
                 />
                 <YAxis
                   allowDecimals={false}
-                  tick={{ fontSize: 10 }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   tickLine={false}
                   axisLine={false}
                   width={20}
                 />
-                <Tooltip />
+                <Tooltip
+                  cursor={{ fill: "var(--color-muted)", opacity: 0.5 }}
+                  contentStyle={TOOLTIP_STYLE}
+                  labelStyle={{ color: "var(--color-muted-foreground)" }}
+                />
                 <Bar
                   dataKey="count"
                   fill="var(--color-primary)"
@@ -95,21 +108,27 @@ export function TrendsCard({
               <BarChart data={districtCosts}>
                 <XAxis
                   dataKey="district"
-                  tick={{ fontSize: 10 }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   tickLine={false}
                   axisLine={false}
                 />
                 <YAxis
                   allowDecimals={false}
-                  tick={{ fontSize: 10 }}
+                  tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
                   tickLine={false}
                   axisLine={false}
                   width={30}
                 />
-                <Tooltip formatter={(v) => [`€${v}`, "Avg. cost"]} />
+                <Tooltip
+                  formatter={(v) => [`€${v}`, "Avg. cost"]}
+                  cursor={{ fill: "var(--color-muted)", opacity: 0.5 }}
+                  contentStyle={TOOLTIP_STYLE}
+                  labelStyle={{ color: "var(--color-muted-foreground)" }}
+                />
                 <Bar
                   dataKey="avgCost"
-                  fill="var(--color-chart-2)"
+                  fill="var(--color-primary)"
+                  fillOpacity={0.55}
                   radius={[3, 3, 0, 0]}
                 />
               </BarChart>

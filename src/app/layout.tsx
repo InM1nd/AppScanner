@@ -32,6 +32,7 @@ export default async function RootLayout({
   const content = (
     <html
       lang={locale}
+      suppressHydrationWarning
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground font-sans">
