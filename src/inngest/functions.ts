@@ -54,7 +54,10 @@ export const refreshListingsJob = inngest.createFunction(
   {
     id: "refresh-listings",
     singleton: singleRun,
-    triggers: { event: "appscanner/refresh-all.requested" },
+    triggers: [
+      { cron: process.env.REFRESH_LISTINGS_CRON ?? "30 */3 * * *" },
+      { event: "appscanner/refresh-all.requested" },
+    ],
   },
   async ({ step }) => {
     const ids = await step.run(

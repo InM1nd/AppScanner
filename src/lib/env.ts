@@ -46,6 +46,7 @@ export const envSchema = z
     CRAWLER_GLOBAL_FETCH_CAP: positiveInteger(40),
     CRAWLER_PER_SEARCH_FETCH_CAP: positiveInteger(15),
     CRAWLER_CRON: optionalNonEmpty,
+    REFRESH_LISTINGS_CRON: optionalNonEmpty,
     SCRAPER_WORKER_ENABLED: z.enum(["true", "false"]).default("false"),
     SCRAPER_WORKER_URL: optionalUrl,
     SCRAPER_WORKER_SECRET: optionalNonEmpty,
