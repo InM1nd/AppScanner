@@ -77,3 +77,26 @@ export function detectContractType(
     return "FIXED_TERM";
   return "UNKNOWN";
 }
+
+// A source page confirming its own listing is gone/taken without a real
+// HTTP 404/410 — Willhaben (and others) render a normal 200 page with a
+// "no longer available" notice instead of erroring, so the structural
+// (missing JSON-LD/advertDetails) checks each parser already has don't
+// catch it. Checked against the raw fetched HTML, not just the extracted
+// description, since the notice usually isn't inside any structured field.
+// ponytail: keyword patterns, not exhaustive — extend when a real page
+// slips through with different wording; a missed match just falls back to
+// parsing the page normally (safe direction to be wrong in).
+const GONE_SIGNAL_PATTERN =
+  /nicht mehr verf[üu]gbar|anzeige (?:wurde |ist )?(?:deaktiviert|inaktiv)|inserat (?:ist )?nicht mehr (?:aktiv|verf[üu]gbar)|is no longer available|listing (?:has been |is )?removed/i;
+const RESERVED_SIGNAL_PATTERN =
+  /bereits (?:reserviert|vermietet|vergeben)|objekt (?:ist )?reserviert|already (?:reserved|rented)/i;
+
+export function detectSourceUnavailableSignal(
+  text: string | null | undefined,
+): "GONE" | "RESERVED" | null {
+  if (!text) return null;
+  if (GONE_SIGNAL_PATTERN.test(text)) return "GONE";
+  if (RESERVED_SIGNAL_PATTERN.test(text)) return "RESERVED";
+  return null;
+}

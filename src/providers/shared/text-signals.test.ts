@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { detectAmenitySignal, parseEuroAmount } from "./text-signals";
+import {
+  detectAmenitySignal,
+  detectSourceUnavailableSignal,
+  parseEuroAmount,
+} from "./text-signals";
 
 describe("parseEuroAmount", () => {
   it("V14 distinguishes Austrian thousands groups from decimal forms", () => {
@@ -16,5 +20,40 @@ describe("detectAmenitySignal", () => {
       detectAmenitySignal("No elevator in the building", ["elevator"]),
     ).toBe("NO");
     expect(detectAmenitySignal("Wohnung ohne Balkon", ["balkon"])).toBe("NO");
+  });
+});
+
+describe("detectSourceUnavailableSignal", () => {
+  it("recognizes a 200-OK 'no longer available' page as GONE", () => {
+    expect(
+      detectSourceUnavailableSignal(
+        "<div>Diese Anzeige ist nicht mehr verfügbar</div>",
+      ),
+    ).toBe("GONE");
+    expect(
+      detectSourceUnavailableSignal("Sorry, this listing is no longer available."),
+    ).toBe("GONE");
+  });
+
+  it("recognizes an already-taken listing as RESERVED", () => {
+    expect(
+      detectSourceUnavailableSignal("Dieses Objekt ist bereits vermietet."),
+    ).toBe("RESERVED");
+  });
+
+  it("returns null for a normal listing page", () => {
+    expect(
+      detectSourceUnavailableSignal(
+        "Ruhige 2-Zimmer-Wohnung, verfügbar ab sofort.",
+      ),
+    ).toBeNull();
+    expect(detectSourceUnavailableSignal(null)).toBeNull();
+  });
+
+  it("does not false-positive on an unrelated 'reserviert' mention", () => {
+    // A reserved parking spot, not the apartment itself — should not match.
+    expect(
+      detectSourceUnavailableSignal("Ein Autoabstellplatz ist reserviert."),
+    ).toBeNull();
   });
 });

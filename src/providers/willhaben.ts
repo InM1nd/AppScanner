@@ -29,6 +29,7 @@ import {
   stripHtml,
   detectHeatingType,
   detectContractType,
+  detectSourceUnavailableSignal,
 } from "./shared/text-signals";
 
 const DOMAINS = ["willhaben.at", "www.willhaben.at"];
@@ -94,6 +95,16 @@ export function parseWillhabenListing(
   html: string,
   fallbackUrl: string,
 ): NormalizedListing {
+  const unavailableSignal = detectSourceUnavailableSignal(html);
+  if (unavailableSignal) {
+    throw new NonListingPageError(
+      unavailableSignal === "GONE"
+        ? "Willhaben shows this listing as no longer available."
+        : "Willhaben shows this listing as already reserved/rented.",
+      unavailableSignal,
+    );
+  }
+
   const $ = cheerio.load(html);
   const raw = $("script#__NEXT_DATA__").contents().text();
   if (!raw) {

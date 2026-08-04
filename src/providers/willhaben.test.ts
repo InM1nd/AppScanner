@@ -71,6 +71,32 @@ describe("parseWillhabenListing", () => {
       NonListingPageError,
     );
   });
+
+  it("flags a soft-gone page (200 OK, 'no longer available' notice) as GONE", () => {
+    const gone = `<div>Diese Anzeige ist nicht mehr verfügbar</div>${html}`;
+    try {
+      parseWillhabenListing(gone, url);
+      expect.unreachable("expected parseWillhabenListing to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(NonListingPageError);
+      expect((error as InstanceType<typeof NonListingPageError>).reason).toBe(
+        "GONE",
+      );
+    }
+  });
+
+  it("flags an already-rented page as RESERVED", () => {
+    const rented = `<div>Dieses Objekt ist bereits vermietet.</div>${html}`;
+    try {
+      parseWillhabenListing(rented, url);
+      expect.unreachable("expected parseWillhabenListing to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(NonListingPageError);
+      expect((error as InstanceType<typeof NonListingPageError>).reason).toBe(
+        "RESERVED",
+      );
+    }
+  });
 });
 
 describe("willhabenProvider.importFromUrl AI fallback", () => {

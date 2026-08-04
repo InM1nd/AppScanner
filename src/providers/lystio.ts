@@ -41,6 +41,7 @@ import {
   stripHtml,
   detectAmenitySignal,
   detectHeatingType,
+  detectSourceUnavailableSignal,
 } from "./shared/text-signals";
 
 const DOMAINS = ["lystio.at", "www.lystio.at"];
@@ -98,6 +99,16 @@ export function parseLystioListing(
   html: string,
   fallbackUrl: string,
 ): NormalizedListing {
+  const unavailableSignal = detectSourceUnavailableSignal(html);
+  if (unavailableSignal) {
+    throw new NonListingPageError(
+      unavailableSignal === "GONE"
+        ? "Lystio shows this listing as no longer available."
+        : "Lystio shows this listing as already reserved/rented.",
+      unavailableSignal,
+    );
+  }
+
   const $ = cheerio.load(html);
   const graph = extractJsonLdGraph(html);
   const listing = graph.find((n) => n["@type"] === "RealEstateListing");

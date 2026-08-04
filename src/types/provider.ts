@@ -2,9 +2,16 @@ import type { NormalizedListing } from "./listing";
 import type { SearchProfile } from "./search-profile";
 
 export class NonListingPageError extends Error {
-  constructor(message: string) {
+  // Set when the page identifies *why* it's not a live listing (the source
+  // itself says "gone" or "reserved/rented") rather than just having an
+  // unrecognized structure. refresh.ts uses this to mark an existing
+  // listing's sourceAvailability precisely instead of defaulting to GONE.
+  reason?: "GONE" | "RESERVED";
+
+  constructor(message: string, reason?: "GONE" | "RESERVED") {
     super(message);
     this.name = "NonListingPageError";
+    this.reason = reason;
   }
 }
 

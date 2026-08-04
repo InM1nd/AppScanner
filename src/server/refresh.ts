@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { getProviderAdapter } from "@/providers";
 import type { ProviderName } from "@/types/enums";
 import type { Listing, Provider } from "@prisma/client";
+import { NonListingPageError } from "@/types/provider";
 import { updateListingFromDraft } from "./listings";
 
 // Only providers whose importFromUrl actually fetches the page (see each
@@ -23,9 +24,11 @@ const REAL_FETCH_PROVIDERS = new Set<ProviderName>([
   "GENERIC_URL",
 ]);
 
-// A source page confirming its own listing is expired (Willhaben redirects
-// rather than 404ing) is as good as a real 404 for "this is gone." 410 Gone
-// is IS24's version of the same thing — a real HTTP status, not a redirect.
+// A real HTTP 404/410 is as good as a "gone" text signal for "this is
+// gone" — IS24 uses 410 Gone; Willhaben/Lystio instead render a normal 200
+// page with a "no longer available" notice, which each adapter now detects
+// itself and surfaces as a NonListingPageError with `.reason` set (see
+// text-signals.ts's detectSourceUnavailableSignal).
 function looksGone(errorMessage: string): boolean {
   return /Fetch failed with status (404|410)\b/.test(errorMessage);
 }
@@ -100,6 +103,12 @@ async function refreshOneListing(
     return { result: "updated" };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof NonListingPageError && error.reason) {
+      await markAvailability(listing.id, listing.providerId, error.reason);
+      return {
+        result: error.reason === "RESERVED" ? "marked_reserved" : "marked_gone",
+      };
+    }
     if (looksGone(message)) {
       await markAvailability(listing.id, listing.providerId, "GONE");
       return { result: "marked_gone" };

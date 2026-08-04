@@ -30,6 +30,7 @@ import {
   detectHeatingType,
   detectContractType,
   detectAmenitySignal,
+  detectSourceUnavailableSignal,
 } from "./shared/text-signals";
 
 const DOMAINS = ["immobilienscout24.at", "www.immobilienscout24.at"];
@@ -185,6 +186,16 @@ export function parseIS24Listing(
   html: string,
   fallbackUrl: string,
 ): NormalizedListing {
+  const unavailableSignal = detectSourceUnavailableSignal(html);
+  if (unavailableSignal) {
+    throw new NonListingPageError(
+      unavailableSignal === "GONE"
+        ? "ImmoScout24 shows this listing as no longer available."
+        : "ImmoScout24 shows this listing as already reserved/rented.",
+      unavailableSignal,
+    );
+  }
+
   const graph = extractJsonLdGraph(html);
   const product = graph.find((n) => n["@type"] === "Product");
   const listing = graph.find((n) => n["@type"] === "RealEstateListing");

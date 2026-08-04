@@ -66,6 +66,19 @@ describe("parseLystioListing", () => {
     );
     expect(parseLystioListing(temporary, url).contractType).toBe("TEMPORARY");
   });
+
+  it("flags a soft-gone page (200 OK, 'no longer available' notice) as GONE", () => {
+    const gone = `<div>This listing is no longer available.</div>${html}`;
+    try {
+      parseLystioListing(gone, url);
+      expect.unreachable("expected parseLystioListing to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(NonListingPageError);
+      expect((error as InstanceType<typeof NonListingPageError>).reason).toBe(
+        "GONE",
+      );
+    }
+  });
 });
 
 describe("lystioProvider.importFromUrl AI fallback", () => {

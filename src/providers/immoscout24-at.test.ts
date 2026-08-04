@@ -172,6 +172,19 @@ describe("parseIS24Listing", () => {
       parseIS24Listing(html, "https://www.immobilienscout24.at/expose/project"),
     ).toThrow(NonListingPageError);
   });
+
+  it("flags a soft-gone page (200 OK, 'no longer available' notice) as GONE", () => {
+    const html = "<div>This listing is no longer available.</div>";
+    try {
+      parseIS24Listing(html, "https://www.immobilienscout24.at/expose/abc123");
+      expect.unreachable("expected parseIS24Listing to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(NonListingPageError);
+      expect((error as InstanceType<typeof NonListingPageError>).reason).toBe(
+        "GONE",
+      );
+    }
+  });
 });
 
 describe("immoScout24AtProvider.importFromUrl AI fallback", () => {
