@@ -58,7 +58,7 @@ export function CompareExplorer({ listings }: { listings: ListingCardVM[] }) {
               )}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   {t("compare.slot")} {slot + 1}
                 </span>
                 {listing && (

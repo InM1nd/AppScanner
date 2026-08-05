@@ -44,7 +44,10 @@ export function ScoreBadge({
       )}
     >
       {score}
-      <span className="font-normal opacity-60">/100</span>
+      {/* opacity-60 previously dropped this well under 4.5:1 against the
+          badge's own tinted background — font-normal alone still reads as
+          de-emphasized next to the bold score. */}
+      <span className="font-normal">/100</span>
     </span>
   );
 }

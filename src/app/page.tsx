@@ -256,7 +256,7 @@ function StatCard({
             {value}
           </div>
           {hint && (
-            <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70 line-clamp-2">
+            <div className="mt-1 text-[11px] leading-snug text-muted-foreground line-clamp-2">
               {hint}
             </div>
           )}

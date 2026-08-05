@@ -48,7 +48,7 @@ export function ListingRow({
             style={{ width: `${completeness}%` }}
           />
         </div>
-        <span className="w-7 text-right text-[10px] tabular-nums text-muted-foreground/70">
+        <span className="w-7 text-right text-[10px] tabular-nums text-muted-foreground">
           {completeness}%
         </span>
       </div>

@@ -127,7 +127,7 @@ export function StatusActions({
       {/* Status progression reads as one segmented control so the current
           stage is obvious; everything else is secondary. */}
       <div className="flex items-center gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           {t("listingDetail.actionsStatus")}
         </span>
         <div className="inline-flex rounded-lg bg-muted p-0.5">

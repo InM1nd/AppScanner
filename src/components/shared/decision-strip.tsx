@@ -107,7 +107,7 @@ export function DecisionStrip({ listing }: { listing: ListingCardVM }) {
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+    <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
       {children}
     </div>
   );

@@ -21,7 +21,7 @@ export function SidebarNav() {
         </div>
         <div className="leading-tight min-w-0">
           <div className="text-sm font-semibold tracking-tight">AppScanner</div>
-          <div className="text-[11px] text-sidebar-foreground/45 truncate">
+          <div className="text-[11px] text-sidebar-foreground/70 truncate">
             {t("nav.brand")}
           </div>
         </div>
@@ -34,7 +34,7 @@ export function SidebarNav() {
       <nav className="flex-1 overflow-y-auto px-3 pb-2 space-y-5">
         {NAV_GROUPS.map((group) => (
           <div key={group.key} className="space-y-0.5">
-            <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-sidebar-foreground/35">
+            <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-sidebar-foreground/60">
               {t(group.key)}
             </div>
             {group.items.map((item) => {
@@ -80,7 +80,7 @@ export function SidebarNav() {
           <LanguageSwitcher />
           <ThemeToggle />
         </div>
-        <p className="text-[11px] leading-snug text-sidebar-foreground/40">
+        <p className="text-[11px] leading-snug text-sidebar-foreground/65">
           {t("nav.footer")}
         </p>
       </div>

@@ -660,7 +660,7 @@ export function ListingsExplorer({
 
           {activeFilters.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {t("listings.filterActive")}
               </span>
               {activeFilters.map((f) => (
@@ -1057,7 +1057,7 @@ function FilterGroup({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="w-24 shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+      <span className="w-24 shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
       {children}
