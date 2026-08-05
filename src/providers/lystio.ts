@@ -399,7 +399,7 @@ export const lystioProvider: ListingProvider = {
     ];
   },
 
-  async importFromUrl(url) {
+  async importFromUrl(url, options) {
     if (!matchesProviderHost(url, DOMAINS)) {
       throw new Error(
         `URL host "${new URL(url).hostname}" is not a Lystio URL.`,
@@ -407,6 +407,7 @@ export const lystioProvider: ListingProvider = {
     }
     const html = await fetchHtml(url, DOMAINS);
     const parsed = parseLystioListing(html, url);
+    if (options?.skipAiExtraction) return parsed;
     const aiFacts = await fillUnknownMoneyFacts(parsed, parsed.description);
     return { ...parsed, ...aiFacts };
   },

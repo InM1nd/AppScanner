@@ -85,7 +85,9 @@ async function refreshOneListing(
     };
 
   try {
-    const draft = await adapter.importFromUrl(listing.canonicalUrl);
+    const draft = await adapter.importFromUrl(listing.canonicalUrl, {
+      skipAiExtraction: true,
+    });
     await updateListingFromDraft(listing.id, draft);
     await db.$transaction([
       db.listing.update({

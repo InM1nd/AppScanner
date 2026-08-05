@@ -20,7 +20,7 @@ export const genericUrlProvider: ListingProvider = {
     return [];
   },
 
-  async importFromUrl(url) {
+  async importFromUrl(url, options) {
     const html = await fetchHtml(url);
     const meta = extractMetadataFromHtml(html);
     const metadataBaseRent =
@@ -36,7 +36,7 @@ export const genericUrlProvider: ListingProvider = {
     );
     const visibleText = stripHtml(html);
     const aiFacts =
-      isAiExtractionEnabled() && visibleText
+      !options?.skipAiExtraction && visibleText && (await isAiExtractionEnabled())
         ? await extractMoneyFieldsWithAI(visibleText, aiFields)
         : {};
 

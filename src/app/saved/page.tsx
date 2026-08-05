@@ -1,4 +1,4 @@
-import { listAllListings } from "@/server/queries";
+import { listSavedListings } from "@/server/queries";
 import { getDictionary } from "@/i18n/server";
 import { formatDateTime } from "@/lib/format";
 import { ListingRow, EmptyRow } from "@/components/shared/listing-row";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function SavedPage() {
   const { dict } = await getDictionary();
   const s = dict.saved;
-  const listings = await listAllListings();
+  const listings = await listSavedListings();
 
   const shortlisted = listings
     .filter((l) => l.status === "SHORTLISTED")

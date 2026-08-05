@@ -3,6 +3,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 import { getEnv } from "@/lib/env";
 import { MONEY_FIELDS, type MoneyField } from "@/server/listing-mapper";
+import { getOwnerUser, getActiveSearchProfile } from "@/server/current-user";
 import type { FinancialFact } from "@/types/listing";
 import { parseEuroAmount } from "./text-signals";
 
@@ -48,17 +49,19 @@ function hasDirectEvidence(
   );
 }
 
-export function isAiExtractionEnabled(): boolean {
+// Two independent switches: the env var is the deploy-time kill switch (also
+// gates whether an API key is even configured), the Settings toggle is the
+// day-to-day one the owner can flip without a redeploy. Both must allow it.
+export async function isAiExtractionEnabled(): Promise<boolean> {
   try {
     const env = getEnv();
-    return (
-      env.AI_EXTRACTION_ENABLED === "true" && Boolean(env.DEEPSEEK_API_KEY)
-    );
+    if (env.AI_EXTRACTION_ENABLED !== "true" || !env.DEEPSEEK_API_KEY)
+      return false;
+    const user = await getOwnerUser();
+    const profile = await getActiveSearchProfile(user.id);
+    return profile.aiExtractionEnabled;
   } catch (error) {
-    console.error(
-      "AI extraction disabled because environment validation failed.",
-      error,
-    );
+    console.error("AI extraction disabled: could not resolve settings.", error);
     return false;
   }
 }
@@ -67,7 +70,7 @@ export async function extractMoneyFieldsWithAI(
   text: string,
   fields: readonly MoneyField[],
 ): Promise<Partial<Record<MoneyField, FinancialFact>>> {
-  if (!text.trim() || fields.length === 0 || !isAiExtractionEnabled())
+  if (!text.trim() || fields.length === 0 || !(await isAiExtractionEnabled()))
     return {};
 
   try {
@@ -124,7 +127,7 @@ export async function fillUnknownMoneyFacts(
   facts: Partial<Record<MoneyField, FinancialFact>>,
   text: string | null,
 ): Promise<Partial<Record<MoneyField, FinancialFact>>> {
-  if (!text?.trim() || !isAiExtractionEnabled()) return {};
+  if (!text?.trim() || !(await isAiExtractionEnabled())) return {};
   const unknownFields = MONEY_FIELDS.filter(
     (field) => (facts[field]?.confidence ?? "UNKNOWN") === "UNKNOWN",
   );

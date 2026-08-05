@@ -446,7 +446,7 @@ export const immoScout24AtProvider: ListingProvider = {
     ];
   },
 
-  async importFromUrl(url) {
+  async importFromUrl(url, options) {
     if (!matchesProviderHost(url, DOMAINS)) {
       throw new Error(
         `URL host "${new URL(url).hostname}" is not an ImmoScout24.at URL.`,
@@ -454,6 +454,7 @@ export const immoScout24AtProvider: ListingProvider = {
     }
     const html = await fetchHtml(url, DOMAINS, true);
     const parsed = parseIS24Listing(html, url);
+    if (options?.skipAiExtraction) return parsed;
     const aiFacts = await fillUnknownMoneyFacts(parsed, parsed.description);
     return { ...parsed, ...aiFacts };
   },

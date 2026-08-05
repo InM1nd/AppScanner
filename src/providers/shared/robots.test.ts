@@ -89,4 +89,27 @@ describe("isFetchAllowedByRobots", () => {
       isFetchAllowedByRobots("https://example.test/expose/1", UA, fallback),
     ).resolves.toBe(true);
   });
+
+  it("doesn't let an unrelated directive between '*' and a later named-bot group merge the two (real ImmoScout24.at robots.txt shape)", async () => {
+    mocks.safeFetchText.mockResolvedValue(
+      [
+        "User-agent: ChatGPT-User",
+        "Allow: /",
+        "",
+        "User-Agent: *",
+        "Content-Signal: ai-train=yes, search=yes, ai-input=yes",
+        "",
+        "Sitemap: https://example.test/sitemap.xml",
+        "",
+        "User-agent: MJ12bot",
+        "Disallow: /expose",
+        "",
+        "User-agent: AhrefsBot",
+        "Disallow: /expose",
+      ].join("\n"),
+    );
+    await expect(
+      isFetchAllowedByRobots("https://example.test/expose/1", UA),
+    ).resolves.toBe(true);
+  });
 });

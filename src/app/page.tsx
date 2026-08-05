@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { listAllListings } from "@/server/queries";
+import { getCurrentUser } from "@/server/current-user";
+import { getDashboardData } from "@/server/dashboard-data";
 import { formatEur } from "@/lib/format";
 import { daysAgo } from "@/lib/time";
-import { getTopMatches } from "@/lib/dashboard";
 import { getDictionary } from "@/i18n/server";
 import { ListingRow, EmptyRow } from "@/components/shared/listing-row";
 import { TrendsCard } from "@/components/dashboard/trends-card";
@@ -29,89 +29,36 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  await getCurrentUser();
   const { dict } = await getDictionary();
   const d = dict.dashboard;
-  const listings = await listAllListings();
+  const {
+    newListings,
+    topMatches,
+    urgent,
+    activeCount,
+    shortlistedCount,
+    avgKnownCost,
+    avgScore,
+    importsByDay,
+    districtCosts,
+  } = await getDashboardData();
   const providers = await db.provider.findMany({ orderBy: { name: "asc" } });
   const savedSearches = await db.savedSearch.findMany({
     include: { provider: true },
   });
-
-  const threeDaysAgo = daysAgo(3);
-  const newListings = listings
-    .filter(
-      (l) =>
-        l.importedAt >= threeDaysAgo &&
-        !["REJECTED", "ARCHIVED"].includes(l.status),
-    )
-    .sort((a, b) => b.importedAt.getTime() - a.importedAt.getTime());
-
-  const topMatches = getTopMatches(listings);
-
-  const urgent = listings.filter((l) => {
-    if (["REJECTED", "ARCHIVED"].includes(l.status)) return false;
-    const highScore =
-      (l.scoreBreakdown?.totalScore ?? 0) >= 70 &&
-      (l.scoreBreakdown?.dataCompleteness ?? 0) >= 70 &&
-      !l.scoreBreakdown?.isZeroed;
-    const staleNew = l.status === "NEW" && l.importedAt < threeDaysAgo;
-    const missingAvailability = l.costRedFlags.includes("NO_AVAILABILITY_DATE");
-    return (
-      (highScore && l.status === "NEW") ||
-      staleNew ||
-      (highScore && missingAvailability)
-    );
-  });
-
-  const activeCount = listings.filter(
-    (l) => !["REJECTED", "ARCHIVED"].includes(l.status),
-  ).length;
-  const shortlistedCount = listings.filter(
-    (l) => l.status === "SHORTLISTED",
-  ).length;
-  const avgKnownCost = listings.length
-    ? Math.round(
-        listings.reduce(
-          (sum, l) =>
-            sum + (l.monthlyLikelyTotal ? Number(l.monthlyLikelyTotal) : 0),
-          0,
-        ) / listings.length,
-      )
-    : null;
-  const avgScore = topMatches.length
-    ? Math.round(
-        topMatches.reduce(
-          (sum, l) => sum + (l.scoreBreakdown?.totalScore ?? 0),
-          0,
-        ) / topMatches.length,
-      )
-    : null;
-
-  const importsByDay: { date: string; count: number }[] = Array.from(
-    { length: 14 },
-    (_, i) => {
-      const day = daysAgo(13 - i);
-      const key = day.toISOString().slice(0, 10);
-      const count = listings.filter(
-        (l) => l.importedAt.toISOString().slice(0, 10) === key,
-      ).length;
-      return { date: key.slice(5), count };
-    },
+  // Manual entry / URL-only providers (no saved search ever exists for
+  // them) can't crawl, so their health status stays UNKNOWN forever — that
+  // reads as a problem when it's just N/A. Only show providers the crawler
+  // can actually run.
+  const crawlableProviderIds = new Set(
+    savedSearches.map((s) => s.providerId),
+  );
+  const crawledProviders = providers.filter((p) =>
+    crawlableProviderIds.has(p.id),
   );
 
-  const districtCostMap = new Map<number, number[]>();
-  for (const l of listings) {
-    if (l.district === null || l.monthlyLikelyTotal === null) continue;
-    const arr = districtCostMap.get(l.district) ?? [];
-    arr.push(Number(l.monthlyLikelyTotal));
-    districtCostMap.set(l.district, arr);
-  }
-  const districtCosts = [...districtCostMap.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([district, costs]) => ({
-      district: String(district),
-      avgCost: Math.round(costs.reduce((a, b) => a + b, 0) / costs.length),
-    }));
+  const threeDaysAgo = daysAgo(3);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto">
@@ -241,7 +188,7 @@ export default async function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2.5">
-              {providers.map((p) => (
+              {crawledProviders.map((p) => (
                 <div
                   key={p.id}
                   className="flex items-center justify-between gap-2 text-sm"
@@ -253,7 +200,9 @@ export default async function DashboardPage() {
                   />
                 </div>
               ))}
-              {providers.length === 0 && <EmptyRow text={d.sourcesEmpty} />}
+              {crawledProviders.length === 0 && (
+                <EmptyRow text={d.sourcesEmpty} />
+              )}
             </CardContent>
           </Card>
 

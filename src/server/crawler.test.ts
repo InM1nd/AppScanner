@@ -5,6 +5,7 @@ import { NonListingPageError } from "@/types/provider";
 const mocks = vi.hoisted(() => ({
   savedSearchFindMany: vi.fn(),
   listingFindMany: vi.fn(),
+  listingUpdate: vi.fn(),
   providerUpdate: vi.fn(),
   getProviderAdapter: vi.fn(),
   createListingFromDraft: vi.fn(),
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => ({
   db: {
     savedSearch: { findMany: mocks.savedSearchFindMany },
-    listing: { findMany: mocks.listingFindMany },
+    listing: { findMany: mocks.listingFindMany, update: mocks.listingUpdate },
     provider: { update: mocks.providerUpdate },
   },
 }));
@@ -39,6 +40,7 @@ describe("crawler progression", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.providerUpdate.mockResolvedValue({});
+    mocks.listingUpdate.mockResolvedValue({});
     mocks.createListingFromDraft.mockResolvedValue({ id: "listing" });
   });
 
@@ -97,6 +99,58 @@ describe("crawler progression", () => {
       "two",
       "three",
     ]);
+  });
+
+  it("re-files an over-budget save as REJECTED and remembers its URL", async () => {
+    mocks.savedSearchFindMany.mockResolvedValue([savedSearch]);
+    mocks.listingFindMany.mockResolvedValue([]);
+    mocks.getProviderAdapter.mockReturnValue({
+      async *discoverListingUrls() {
+        yield "https://example.com/listing/pricey";
+      },
+      importFromUrl: vi.fn(async (url: string) => ({
+        canonicalUrl: url,
+        sourceListingId: "pricey",
+      })),
+    });
+    mocks.createListingFromDraft.mockResolvedValue({
+      id: "listing-pricey",
+      scoreBreakdown: {
+        isZeroed: true,
+        zeroReason: "All-in monthly cost exceeds the absolute maximum.",
+      },
+    });
+
+    const summary = await runSearchCrawler(savedSearch.id);
+
+    expect(summary).toMatchObject({ saved: 1, rejectedOverBudget: 1 });
+    expect(mocks.listingUpdate).toHaveBeenCalledWith({
+      where: { id: "listing-pricey" },
+      data: { status: "REJECTED" },
+    });
+  });
+
+  it("leaves a zeroed-for-another-reason save alone", async () => {
+    mocks.savedSearchFindMany.mockResolvedValue([savedSearch]);
+    mocks.listingFindMany.mockResolvedValue([]);
+    mocks.getProviderAdapter.mockReturnValue({
+      async *discoverListingUrls() {
+        yield "https://example.com/listing/wg-room";
+      },
+      importFromUrl: vi.fn(async (url: string) => ({
+        canonicalUrl: url,
+        sourceListingId: "wg-room",
+      })),
+    });
+    mocks.createListingFromDraft.mockResolvedValue({
+      id: "listing-wg",
+      scoreBreakdown: { isZeroed: true, zeroReason: "Shared apartment / WG room." },
+    });
+
+    const summary = await runSearchCrawler(savedSearch.id);
+
+    expect(summary).toMatchObject({ saved: 1, rejectedOverBudget: 0 });
+    expect(mocks.listingUpdate).not.toHaveBeenCalled();
   });
 
   it("marks an all-non-listing crawl as degraded", async () => {

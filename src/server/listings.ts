@@ -219,12 +219,15 @@ export interface CreateListingOptions {
   draft: NormalizedListing;
   /** Skip the hard-reject on an exact duplicate match (used by the review UI's "save anyway"). */
   allowExactDuplicate?: boolean;
+  /** Overrides the default NEW status (used by the crawler to file over-budget finds straight into REJECTED). */
+  initialStatus?: ListingStatus;
 }
 
 export async function createListingFromDraft({
   providerName,
   draft,
   allowExactDuplicate,
+  initialStatus,
 }: CreateListingOptions) {
   const validation = validateListingDraft(draft);
   if (!validation.valid) {
@@ -292,6 +295,7 @@ export async function createListingFromDraft({
       const created = await tx.listing.create({
         data: {
           ...draftToListingFields(draft),
+          ...(initialStatus ? { status: initialStatus } : {}),
           providerId: provider.id,
           duplicateClusterId,
           normalizedCanonicalUrl:

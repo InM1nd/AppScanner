@@ -30,10 +30,21 @@ export interface ProviderSetupInstruction {
 
 // Every provider must go through this interface — no direct scraping calls
 // anywhere else in the app. See AGENTS.md "Ingestion rules".
+export interface ImportFromUrlOptions {
+  /** Skip the AI money-field fill-in — used by the hourly refresh job, since
+   * a listing's description text essentially never changes after first
+   * import, so re-querying the model there for a field that came back
+   * UNKNOWN once is a pure repeat cost with no realistic upside. */
+  skipAiExtraction?: boolean;
+}
+
 export interface ListingProvider {
   name: string;
   getSearchUrls(profile: SearchProfile): ProviderSearchUrl[];
-  importFromUrl(url: string): Promise<NormalizedListing>;
+  importFromUrl(
+    url: string,
+    options?: ImportFromUrlOptions,
+  ): Promise<NormalizedListing>;
   parseEmailAlert?(rawEmail: string): Promise<NormalizedListing[]>;
   /** Walks a saved search's result pages and yields listing detail URLs, one page at a time. */
   discoverListingUrls?(searchUrl: string): AsyncGenerator<string>;

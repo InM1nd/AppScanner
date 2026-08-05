@@ -6,6 +6,7 @@ import { ScoringWeightsForm } from "@/components/settings/scoring-weights-form";
 import { TelegramTestPanel } from "@/components/settings/telegram-test-panel";
 import { ProfileExportImport } from "@/components/settings/profile-export-import";
 import { RefreshListingsPanel } from "@/components/settings/refresh-listings-panel";
+import { AiExtractionPanel } from "@/components/settings/ai-extraction-panel";
 import { ProviderSetupPanel } from "@/components/import/provider-setup-panel";
 import {
   Card,
@@ -87,6 +88,7 @@ export default async function SettingsPage() {
             weights={profile.scoringWeights}
           />
           <RefreshListingsPanel />
+          <AiExtractionPanel initial={profileRow.aiExtractionEnabled} />
         </div>
         <div>
           <h3 className="mb-3 text-sm font-medium text-muted-foreground">

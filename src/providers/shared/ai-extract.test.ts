@@ -5,11 +5,16 @@ const mocks = vi.hoisted(() => ({
     AI_EXTRACTION_ENABLED: "true",
     DEEPSEEK_API_KEY: "test-key",
   },
+  profile: { aiExtractionEnabled: true },
   generateText: vi.fn(),
   model: vi.fn(() => "deepseek-model"),
 }));
 
 vi.mock("@/lib/env", () => ({ getEnv: () => mocks.env }));
+vi.mock("@/server/current-user", () => ({
+  getOwnerUser: async () => ({ id: "owner" }),
+  getActiveSearchProfile: async () => mocks.profile,
+}));
 vi.mock("@ai-sdk/openai-compatible", () => ({
   createOpenAICompatible: () => mocks.model,
 }));
@@ -25,6 +30,7 @@ describe("extractMoneyFieldsWithAI", () => {
     vi.clearAllMocks();
     mocks.env.AI_EXTRACTION_ENABLED = "true";
     mocks.env.DEEPSEEK_API_KEY = "test-key";
+    mocks.profile.aiExtractionEnabled = true;
   });
 
   it("accepts only ESTIMATE/UNKNOWN facts and rejects EXACT", async () => {
@@ -142,6 +148,15 @@ describe("extractMoneyFieldsWithAI", () => {
     ).resolves.toEqual({});
     expect(mocks.generateText).not.toHaveBeenCalled();
   });
+
+  it("does not call the SDK when the Settings toggle is off, even with the env var enabled", async () => {
+    mocks.profile.aiExtractionEnabled = false;
+
+    await expect(
+      extractMoneyFieldsWithAI("Miete EUR 1.200", ["baseRent"]),
+    ).resolves.toEqual({});
+    expect(mocks.generateText).not.toHaveBeenCalled();
+  });
 });
 
 describe("fillUnknownMoneyFacts", () => {
@@ -149,6 +164,7 @@ describe("fillUnknownMoneyFacts", () => {
     vi.clearAllMocks();
     mocks.env.AI_EXTRACTION_ENABLED = "true";
     mocks.env.DEEPSEEK_API_KEY = "test-key";
+    mocks.profile.aiExtractionEnabled = true;
   });
 
   it("only requests fields that are still unknown", async () => {

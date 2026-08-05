@@ -42,7 +42,7 @@ export async function extractListingsFromEmail(
       (field) =>
         field !== "baseRent" || heuristicBaseRent.confidence === "UNKNOWN",
     );
-    const aiFacts = isAiExtractionEnabled()
+    const aiFacts = (await isAiExtractionEnabled())
       ? await extractMoneyFieldsWithAI(
           rawEmail.slice(Math.max(0, urlIndex - 2_000), urlIndex + 1_000),
           aiFields,

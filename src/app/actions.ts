@@ -199,6 +199,19 @@ export async function updateScoringWeightsAction(weights: unknown) {
   return { recalculated: count };
 }
 
+export async function updateAiExtractionEnabledAction(enabled: boolean) {
+  const user = await getCurrentUser();
+  const profile = await db.searchProfile.findFirst({
+    where: { userId: user.id, isActive: true },
+  });
+  if (!profile) throw new Error("No active search profile found.");
+  await db.searchProfile.update({
+    where: { id: profile.id },
+    data: { aiExtractionEnabled: enabled },
+  });
+  revalidatePath("/settings");
+}
+
 export async function sendTelegramTestAction() {
   const user = await getCurrentUser();
   return sendTelegramTest(user.id);

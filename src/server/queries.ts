@@ -34,6 +34,17 @@ export async function listAllListings(): Promise<ListingCard[]> {
   });
 }
 
+export async function listSavedListings(): Promise<ListingCard[]> {
+  await getCurrentUser();
+  return db.listing.findMany({
+    where: {
+      OR: [{ status: "SHORTLISTED" }, { watchlistItems: { some: {} } }],
+    },
+    include: LISTING_CARD_INCLUDE,
+    orderBy: { importedAt: "desc" },
+  });
+}
+
 export async function getListingDetail(
   id: string,
 ): Promise<ListingDetail | null> {

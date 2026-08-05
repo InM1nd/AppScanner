@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { normalizeCanonicalUrl } from "@/lib/duplicate";
 import { getProviderAdapter } from "@/providers";
 import { NonListingPageError } from "@/types/provider";
+import { OVER_BUDGET_ZERO_REASON } from "@/lib/score";
 import type { ProviderName } from "@/types/enums";
 import { createListingFromDraft, DuplicateListingError } from "./listings";
 
@@ -43,6 +44,7 @@ export interface CrawlSummary {
   saved: number;
   duplicates: number;
   skippedNonListings: number;
+  rejectedOverBudget: number;
   failed: number;
   errors: string[];
 }
@@ -76,6 +78,7 @@ export async function runSearchCrawler(
     saved: 0,
     duplicates: 0,
     skippedNonListings: 0,
+    rejectedOverBudget: 0,
     failed: 0,
     errors: [],
   };
@@ -140,10 +143,28 @@ export async function runSearchCrawler(
           try {
             const draft = await adapter.importFromUrl(url);
             duplicateStreak = 0;
-            await createListingFromDraft({ providerName, draft });
+            const created = await createListingFromDraft({
+              providerName,
+              draft,
+            });
             summary.saved++;
             const savedUrl = normalizeCanonicalUrl(draft.canonicalUrl);
             if (savedUrl) knownUrls.add(savedUrl);
+            // Budget check runs inside recomputeListing (single entry point
+            // for cost/score), so the crawler can only react after the fact
+            // — re-filing as REJECTED here (rather than skipping the save
+            // outright) keeps the URL in knownUrls above so the next hourly
+            // run doesn't re-fetch and re-parse it forever.
+            if (
+              created.scoreBreakdown?.isZeroed &&
+              created.scoreBreakdown.zeroReason === OVER_BUDGET_ZERO_REASON
+            ) {
+              await db.listing.update({
+                where: { id: created.id },
+                data: { status: "REJECTED" },
+              });
+              summary.rejectedOverBudget++;
+            }
           } catch (error) {
             if (error instanceof DuplicateListingError) {
               summary.duplicates++;

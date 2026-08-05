@@ -21,6 +21,15 @@ function parseRobotsTxt(text: string, userAgent: string): RobotsRuleSet {
     agents: string[];
     rules: { type: "allow" | "disallow"; path: string }[];
   } | null = null;
+  // A new "User-agent:" line only continues the current group when it
+  // directly follows another "User-agent:" line (the standard way a group
+  // targets multiple agents). Using "rules.length > 0" as that signal is
+  // wrong: an unrecognized directive (e.g. "Content-Signal:") or a run of
+  // "Sitemap:" lines between the last User-agent line and the next one
+  // leaves rules.length at 0, so the next agent (say "MJ12bot") gets merged
+  // into the previous group ("*") instead of starting its own — silently
+  // inheriting that group's Disallow rules for every site.
+  let lastLineWasUserAgent = false;
 
   for (const rawLine of lines) {
     const line = rawLine.split("#")[0].trim();
@@ -30,13 +39,16 @@ function parseRobotsTxt(text: string, userAgent: string): RobotsRuleSet {
     const value = rest.join(":").trim();
 
     if (key === "user-agent") {
-      if (!current || current.rules.length > 0) {
+      if (!current || !lastLineWasUserAgent) {
         current = { agents: [], rules: [] };
         groups.push(current);
       }
       current.agents.push(value.toLowerCase());
-    } else if ((key === "disallow" || key === "allow") && current) {
-      current.rules.push({ type: key, path: value });
+      lastLineWasUserAgent = true;
+    } else {
+      if ((key === "disallow" || key === "allow") && current)
+        current.rules.push({ type: key, path: value });
+      lastLineWasUserAgent = false;
     }
   }
 

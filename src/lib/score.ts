@@ -449,6 +449,13 @@ function scoreInfrastructure(
   };
 }
 
+// Exported so callers that need to react specifically to the budget
+// violation (the crawler auto-rejects over-budget finds) can match on it
+// instead of duplicating the cost-vs-max comparison outside recompute.ts's
+// single entry point for score/cost writes.
+export const OVER_BUDGET_ZERO_REASON =
+  "All-in monthly cost exceeds the absolute maximum.";
+
 function hardViolation(
   listing: ScoreListingInput,
   cost: CostBreakdown,
@@ -481,7 +488,7 @@ function hardViolation(
   if (profile.parkingRequired && listing.parkingAvailability === "NONE")
     return "No parking available.";
   if (cost.monthlyKnownCost > profile.absoluteMonthlyMax)
-    return "All-in monthly cost exceeds the absolute maximum.";
+    return OVER_BUDGET_ZERO_REASON;
   return null;
 }
 

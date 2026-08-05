@@ -214,6 +214,7 @@ model SearchProfile {
   petsAllowed             Boolean  @default(false)
   preferNoCommission      Boolean  @default(true)
   longTermOnly            Boolean  @default(true)
+  aiExtractionEnabled     Boolean  @default(true)
   scoringWeights          Json     @default("{\"budget\":25,\"commute\":25,\"layout\":15,\"condition\":10,\"parking\":8,\"moveIn\":7,\"contract\":5,\"infrastructure\":5}")
   isActive                Boolean  @default(true)
   createdAt               DateTime @default(now())
