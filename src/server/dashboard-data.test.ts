@@ -52,7 +52,10 @@ describe("getDashboardData", () => {
         { importedAt: new Date() },
       ]); // recentImports
     mocks.count.mockResolvedValueOnce(12).mockResolvedValueOnce(3);
-    mocks.aggregate.mockResolvedValue({ _sum: { monthlyLikelyTotal: 2400 }, _count: 12 });
+    mocks.aggregate.mockResolvedValue({
+      _sum: { monthlyLikelyTotal: 2400 },
+      _count: 12,
+    });
     mocks.groupBy.mockResolvedValue([
       { district: 15, _avg: { monthlyLikelyTotal: 1100 } },
       { district: 16, _avg: { monthlyLikelyTotal: 900 } },
@@ -81,7 +84,10 @@ describe("getDashboardData", () => {
 
   it("returns null avgKnownCost/avgScore when there is nothing to average", async () => {
     mocks.aggregate.mockReset();
-    mocks.aggregate.mockResolvedValue({ _sum: { monthlyLikelyTotal: null }, _count: 0 });
+    mocks.aggregate.mockResolvedValue({
+      _sum: { monthlyLikelyTotal: null },
+      _count: 0,
+    });
     mocks.findMany.mockReset();
     mocks.findMany
       .mockResolvedValueOnce([]) // newListings

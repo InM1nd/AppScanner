@@ -144,7 +144,10 @@ describe("crawler progression", () => {
     });
     mocks.createListingFromDraft.mockResolvedValue({
       id: "listing-wg",
-      scoreBreakdown: { isZeroed: true, zeroReason: "Shared apartment / WG room." },
+      scoreBreakdown: {
+        isZeroed: true,
+        zeroReason: "Shared apartment / WG room.",
+      },
     });
 
     const summary = await runSearchCrawler(savedSearch.id);

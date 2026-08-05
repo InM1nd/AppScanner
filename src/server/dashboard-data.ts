@@ -105,7 +105,9 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const avgKnownCost =
     costAgg._count > 0
-      ? Math.round((toNum(costAgg._sum.monthlyLikelyTotal) ?? 0) / costAgg._count)
+      ? Math.round(
+          (toNum(costAgg._sum.monthlyLikelyTotal) ?? 0) / costAgg._count,
+        )
       : null;
   const avgScore = topMatches.length
     ? Math.round(

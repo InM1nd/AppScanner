@@ -51,9 +51,7 @@ export default async function DashboardPage() {
   // them) can't crawl, so their health status stays UNKNOWN forever — that
   // reads as a problem when it's just N/A. Only show providers the crawler
   // can actually run.
-  const crawlableProviderIds = new Set(
-    savedSearches.map((s) => s.providerId),
-  );
+  const crawlableProviderIds = new Set(savedSearches.map((s) => s.providerId));
   const crawledProviders = providers.filter((p) =>
     crawlableProviderIds.has(p.id),
   );

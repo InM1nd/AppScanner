@@ -18,7 +18,9 @@ vi.mock("@/lib/db", () => ({
     $transaction: vi.fn((ops) => Promise.all(ops)),
   },
 }));
-vi.mock("@/providers", () => ({ getProviderAdapter: mocks.getProviderAdapter }));
+vi.mock("@/providers", () => ({
+  getProviderAdapter: mocks.getProviderAdapter,
+}));
 vi.mock("./listings", () => ({
   updateListingFromDraft: mocks.updateListingFromDraft,
 }));

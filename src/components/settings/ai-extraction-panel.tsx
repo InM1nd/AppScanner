@@ -38,11 +38,10 @@ export function AiExtractionPanel({ initial }: { initial: boolean }) {
       <CardHeader>
         <CardTitle className="text-base">AI money-field extraction</CardTitle>
         <CardDescription>
-          When a listing&apos;s price breakdown (heating, electricity,
-          deposit, fees) is only stated in free text, DeepSeek fills it in
-          from the description. Applies to new imports only — the hourly
-          refresh never calls it, since re-fetched description text doesn&apos;t
-          change.
+          When a listing&apos;s price breakdown (heating, electricity, deposit,
+          fees) is only stated in free text, DeepSeek fills it in from the
+          description. Applies to new imports only — the hourly refresh never
+          calls it, since re-fetched description text doesn&apos;t change.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">

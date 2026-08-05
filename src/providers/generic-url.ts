@@ -36,7 +36,9 @@ export const genericUrlProvider: ListingProvider = {
     );
     const visibleText = stripHtml(html);
     const aiFacts =
-      !options?.skipAiExtraction && visibleText && (await isAiExtractionEnabled())
+      !options?.skipAiExtraction &&
+      visibleText &&
+      (await isAiExtractionEnabled())
         ? await extractMoneyFieldsWithAI(visibleText, aiFields)
         : {};
 
