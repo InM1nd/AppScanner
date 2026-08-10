@@ -25,7 +25,11 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    // /api/inngest is excluded here, not just early-returned inside
+    // withClerk: Inngest verifies its own request signatures, and every
+    // step.run is a separate invocation — running Clerk on all of them is
+    // pure Active CPU burn.
+    "/((?!_next|api/inngest|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/((?!api/inngest)(?:api|trpc))(.*)",
   ],
 };

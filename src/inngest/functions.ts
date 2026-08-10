@@ -109,20 +109,28 @@ export const recoverPendingRecomputesJob = inngest.createFunction(
   {
     id: "recover-pending-recomputes",
     singleton: singleRun,
-    triggers: { cron: "*/10 * * * *" },
+    // Every step.run is its own function invocation, so an empty run of a
+    // frequent cron is pure billed overhead. Owner + pending listings load
+    // in ONE step, and the interval is env-tunable — this is a backstop for
+    // recomputePending, not a latency path.
+    triggers: { cron: process.env.RECOVER_RECOMPUTES_CRON ?? "*/30 * * * *" },
   },
   async ({ step }) => {
-    const user = await step.run("load-owner", getOwnerUser);
-    const ids = await step.run("load-pending-listings", () =>
-      db.listing.findMany({
-        where: { recomputePending: true },
-        select: { id: true },
-        orderBy: { id: "asc" },
-        take: 100,
-      }),
+    const { userId, ids } = await step.run(
+      "load-pending-listings",
+      async () => {
+        const user = await getOwnerUser();
+        const rows = await db.listing.findMany({
+          where: { recomputePending: true },
+          select: { id: true },
+          orderBy: { id: "asc" },
+          take: 100,
+        });
+        return { userId: user.id, ids: rows.map((row) => row.id) };
+      },
     );
-    for (const { id } of ids) {
-      await step.run(`recover-${id}`, () => recomputeListing(id, user.id));
+    for (const id of ids) {
+      await step.run(`recover-${id}`, () => recomputeListing(id, userId));
     }
     return { recovered: ids.length };
   },
@@ -173,28 +181,34 @@ export const viewingRemindersJob = inngest.createFunction(
   {
     id: "viewing-reminders",
     singleton: singleRun,
-    triggers: { cron: "*/15 * * * *" },
+    triggers: { cron: process.env.VIEWING_REMINDERS_CRON ?? "*/15 * * * *" },
   },
   async ({ step }) => {
-    const user = await step.run("load-owner", getOwnerUser);
-    const due = await step.run("load-due-viewings", () =>
-      db.watchlistItem.findMany({
-        where: {
-          userId: user.id,
-          scheduledViewingAt: {
-            gte: new Date(Date.now() - 15 * 60 * 1000),
-            lte: new Date(Date.now() + 2 * 60 * 60 * 1000),
+    // Single step for the same reason as recover-pending-recomputes: an
+    // empty run should cost as few invocations as possible.
+    const { userId, listingIds } = await step.run(
+      "load-due-viewings",
+      async () => {
+        const user = await getOwnerUser();
+        const due = await db.watchlistItem.findMany({
+          where: {
+            userId: user.id,
+            scheduledViewingAt: {
+              gte: new Date(Date.now() - 15 * 60 * 1000),
+              lte: new Date(Date.now() + 2 * 60 * 60 * 1000),
+            },
           },
-        },
-        select: { listingId: true },
-      }),
+          select: { listingId: true },
+        });
+        return { userId: user.id, listingIds: due.map((d) => d.listingId) };
+      },
     );
-    for (const item of due) {
-      await step.run(`remind-${item.listingId}`, () =>
-        notifyViewingReminder(user.id, item.listingId),
+    for (const listingId of listingIds) {
+      await step.run(`remind-${listingId}`, () =>
+        notifyViewingReminder(userId, listingId),
       );
     }
-    return { checked: due.length };
+    return { checked: listingIds.length };
   },
 );
 

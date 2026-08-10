@@ -44,10 +44,16 @@ async function markAvailability(
   await db.$transaction(async (tx) => {
     const changed = await tx.listing.updateMany({
       where: { id: listingId, sourceAvailability: { not: availability } },
-      data: {
-        sourceAvailability: availability,
-        lastSourceCheckedAt: new Date(),
-      },
+      data: { sourceAvailability: availability },
+    });
+    // Stamped unconditionally, outside the `changed` check —
+    // listRefreshableListingIds filters on this column, and when the
+    // availability was ALREADY the same value updateMany matches nothing,
+    // so folding the stamp into it left re-confirmed listings with a stale
+    // (or null) timestamp and they got re-fetched on every single run.
+    await tx.listing.update({
+      where: { id: listingId },
+      data: { lastSourceCheckedAt: new Date() },
     });
     if (changed.count === 1) {
       await tx.listingSnapshot.create({
@@ -115,14 +121,23 @@ async function refreshOneListing(
       await markAvailability(listing.id, listing.providerId, "GONE");
       return { result: "marked_gone" };
     }
-    await db.provider.update({
-      where: { id: listing.providerId },
-      data: {
-        healthStatus: "DEGRADED",
-        lastHealthCheckAt: new Date(),
-        lastError: message.slice(0, 1000),
-      },
-    });
+    await db.$transaction([
+      db.provider.update({
+        where: { id: listing.providerId },
+        data: {
+          healthStatus: "DEGRADED",
+          lastHealthCheckAt: new Date(),
+          lastError: message.slice(0, 1000),
+        },
+      }),
+      // A listing whose fetch keeps failing must still count as "checked",
+      // otherwise the staleness filter never excludes it and the bulk job
+      // retries the same broken URL on every run.
+      db.listing.update({
+        where: { id: listing.id },
+        data: { lastSourceCheckedAt: new Date() },
+      }),
+    ]);
     return { result: "skipped", error: message };
   }
 }
@@ -137,6 +152,14 @@ export async function refreshSingleListing(
   return refreshOneListing(listing);
 }
 
+// The Inngest bulk job spends one function invocation per listing it
+// returns, and its cron fires every 3h — so an unfiltered list meant every
+// listing was re-fetched 8x/day. Decoupled here: the cron stays frequent
+// (so a newly-imported listing is picked up soon) while each individual
+// listing is only re-checked once per REFRESH_MIN_AGE_HOURS.
+const refreshMinAgeMs = () =>
+  Number(process.env.REFRESH_MIN_AGE_HOURS ?? 12) * 60 * 60 * 1000;
+
 export async function listRefreshableListingIds(): Promise<string[]> {
   const rows = await db.listing.findMany({
     where: {
@@ -144,9 +167,29 @@ export async function listRefreshableListingIds(): Promise<string[]> {
         isEnabled: true,
         name: { in: [...REAL_FETCH_PROVIDERS] },
       },
+      // GONE is terminal for a rental listing. RESERVED is not — those keep
+      // getting checked, since a reservation can fall through. The detail
+      // page's "Refresh from source" button calls refreshSingleListing and
+      // bypasses this filter, so a GONE listing can still be re-checked by
+      // hand.
+      sourceAvailability: { not: "GONE" },
+      OR: [
+        { lastSourceCheckedAt: null },
+        {
+          lastSourceCheckedAt: { lt: new Date(Date.now() - refreshMinAgeMs()) },
+        },
+      ],
     },
     select: { id: true },
-    orderBy: { id: "asc" },
+    // Oldest-checked first, NOT by id — with a `take` cap, id ordering would
+    // refresh the head of the table forever and starve the tail. Oldest-first
+    // turns the cap into a round-robin: every listing still comes up, just
+    // spread across runs instead of all in one spike.
+    orderBy: { lastSourceCheckedAt: { sort: "asc", nulls: "first" } },
+    // Bounds a single run. Without it, the staleness filter alone only
+    // shifts the phase — every listing refreshed in one run goes stale at
+    // the same moment and they all come due together in one big spike.
+    take: Number(process.env.REFRESH_BATCH_SIZE ?? 50),
   });
   return rows.map(({ id }) => id);
 }
